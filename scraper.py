@@ -39,7 +39,7 @@ def main():
     prompt = "Analyze this harbor condition dashboard display image and extract every active numeric value and text data point specified in the schema output structure."
     
     response = ai_client.models.generate_content(
-        model='gemini-2.5-flash',
+    model='gemini-2.5-flash-latest',
         contents=[img, prompt],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",

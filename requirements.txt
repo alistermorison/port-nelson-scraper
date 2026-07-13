@@ -2,3 +2,4 @@ requests
 supabase
 google-genai
 pydantic
+pillow

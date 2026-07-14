@@ -1,3 +1,4 @@
+import time
 import os
 import json
 import requests
@@ -38,19 +39,30 @@ def main():
     
     prompt = "Analyze this harbor condition dashboard display image and extract every active numeric value and text data point specified in the schema output structure."
     
-    response = ai_client.models.generate_content(
-        model='gemini-3.5-flash',
-        contents=[img, prompt],
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=HarborConditions,
-            temperature=0.0
-        ),
-    )
-    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = ai_client.models.generate_content(
+                model='gemini-3.5-flash',
+                contents=[img, prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=HarborConditions,
+                    temperature=0.0
+                ),
+            )
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"Gemini server is busy ({e}). Retrying in 15 seconds... (Attempt {attempt + 1}/{max_retries})")
+                time.sleep(15)
+            else:
+                print("Max retries reached. Google servers are completely unavailable.")
+                raise e
+
     data = json.loads(response.text)
     
-    # Even though columns are text in Supabase, saving integers as strings 
+    # Even though columns are text in Supabase, saving integers as strings
     # lets Grafana handle them natively as clean numeric scales.
     supabase.table("harbor_conditions").insert(data).execute()
     print("AI Vision Scraper successfully logged entry with numeric degrees:", data)

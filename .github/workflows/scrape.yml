@@ -1,5 +1,7 @@
 name: Port Nelson Harbor Scraper
-
+concurrency:
+  group: scraper-group
+  cancel-in-progress: true
 on:
   workflow_dispatch: # Allows Cron-Job.org to trigger the script via API every 5 minutes
   push:

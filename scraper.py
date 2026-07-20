@@ -43,7 +43,7 @@ def main():
     for attempt in range(max_retries):
         try:
             response = ai_client.models.generate_content(
-                model='gemini-1.5-flash',
+                model='gemini-2.5-flash',
                 contents=[img, prompt],
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",

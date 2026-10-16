@@ -1,4 +1,5 @@
 import time
+from typing import Optional
 import os
 import json
 import requests
@@ -32,6 +33,8 @@ class HarborConditions(BaseModel):
     fairway_wind: float = Field(description="The Fairway Beacon: Wind value as a decimal float")
     fairway_gust: float = Field(description="The Fairway Beacon: Gust value as a decimal float")
     fairway_dir: int = Field(description="Extract ONLY the numeric degree integer for direction (e.g. extract 177 from '177 S')")
+    sig_wave_height: Optional[float] = Field(default=None, description="The significant wave height (Sig Wave Hgt / Hs) in metres as a decimal float, or null if not shown")
+    h10_wave_height: Optional[float] = Field(default=None, description="The highest tenth wave height (Highest 10th Hgt / H1/10) in metres as a decimal float, or null if not shown")
 
 def main():
     response = requests.get(IMG_URL, headers={'User-Agent': 'Mozilla/5.0'})
@@ -62,8 +65,8 @@ def main():
 
     data = json.loads(response.text)
     
-    # Even though columns are text in Supabase, saving integers as strings
-    # lets Grafana handle them natively as clean numeric scales.
+    # Direction columns are integers in Supabase; wave heights may be null
+    # if the image doesn't show them.
     supabase.table("harbor_conditions").insert(data).execute()
     print("AI Vision Scraper successfully logged entry with numeric degrees:", data)
 

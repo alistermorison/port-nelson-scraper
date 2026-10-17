@@ -233,3 +233,10 @@ test("last evening's sea breeze does not count this morning", () => {
   assert.equal(r.settledAt, null);
   assert.ok(r.window.lo >= 417 && r.window.lo < 1440); // a morning window, not 23:35
 });
+
+test('raceWind ignores an offshore wind before the sea breeze', () => {
+  const southerly = day(() => ({ fw: 7, fd: 170 }));
+  assert.equal(raceWind(southerly).source, 'live');
+  assert.deepEqual(raceWind(southerly, { onshoreOnly: true }), { kn: TYPICAL_BREEZE_KN, source: 'typical' });
+  assert.equal(raceWind(day(() => ({ fw: 11, fd: 355 })), { onshoreOnly: true }).source, 'live');
+});

@@ -374,8 +374,11 @@ export function beatLength(polar, tws, signal, { targetMinutes = TARGET_MINUTES,
 // Wind speed to plan the course on: the Fairway mean over the last 30 minutes once
 // there is breeze, otherwise the typical settled sea breeze.
 export const TYPICAL_BREEZE_KN = 9;
-export function raceWind(bins) {
-  const v = bins.slice(-3).map(b => b.fw).filter(x => x != null);
+// onshoreOnly: before the sea breeze, an offshore wind says nothing about race-time wind.
+export function raceWind(bins, { onshoreOnly = false } = {}) {
+  const last = bins.slice(-3);
+  if (onshoreOnly && !(last.length && last.every(b => isOnshore(b.fd)))) return { kn: TYPICAL_BREEZE_KN, source: 'typical' };
+  const v = last.map(b => b.fw).filter(x => x != null);
   const mean = v.length ? v.reduce((s, a) => s + a, 0) / v.length : null;
   return mean != null && mean >= MIN_STEADY_KN ? { kn: mean, source: 'live' } : { kn: TYPICAL_BREEZE_KN, source: 'typical' };
 }

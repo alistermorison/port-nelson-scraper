@@ -223,3 +223,13 @@ test('forecast summary and hint', () => {
   assert.match(forecastHint({ landSea: 3, gradOnshore: -3 }).text, /about usual/);
   assert.equal(forecastHint({}), null);
 });
+
+test("last evening's sea breeze does not count this morning", () => {
+  // Yesterday 18:00–24:00 onshore at both stations, then a 7 kn southerly from midnight.
+  const bins = bin10(cleanRows(rows(-360, 420, m => m < 0 ? { fw: 6, fd: 350 } : { fw: 7, fd: 168 })));
+  const r = evaluate(bins, { nowMs: at(417) });
+  assert.equal(r.status, 'Waiting');
+  assert.equal(r.alertIdx, -1);
+  assert.equal(r.settledAt, null);
+  assert.ok(r.window.lo >= 417 && r.window.lo < 1440); // a morning window, not 23:35
+});

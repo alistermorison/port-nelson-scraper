@@ -5,7 +5,7 @@ stations from Supabase every 2 minutes and shows:
 
 - the breeze status (Waiting, Building, Arriving, Settled, Unsettled, Gradient wind)
 - the expected arrival window and a suggested start time
-- the windward mark bearing and its position from the chosen course area
+- a "For BuoyZone" panel: course axis, course size and axis position, tap to copy
 - a postponement suggestion when the breeze looks unlikely before 13:00
 
 Taps on "What you can see" are kept on the phone for the day and can be downloaded

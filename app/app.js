@@ -1,5 +1,5 @@
 import {
-  cleanRows, bin10, evaluate, nzParts, fmtMinutes, destination, fmtDDM, COURSE_AREAS, isOnshore,
+  cleanRows, bin10, evaluate, nzParts, fmtMinutes, fmtDDM, COURSE_AREAS, isOnshore,
 } from './logic.js';
 
 const SUPABASE_URL = 'https://sffjznjsxcnhetmiipui.supabase.co';
@@ -67,18 +67,22 @@ function render() {
     $('startNote').textContent = 'Wait for a steady breeze.';
   }
 
-  $('bearing').textContent = `${String(r.bearing.bearing).padStart(3, '0')}° ± ${r.bearing.spread}°`;
+  const axis = `${String(r.bearing.bearing).padStart(3, '0')}°`;
+  $('bearing').textContent = axis;
+  $('bearing').dataset.copy = axis;
+  $('size').textContent = `${s.leg} nm`;
+  $('size').dataset.copy = String(s.leg);
   $('bearingNote').textContent = r.bearing.source === 'live'
-    ? `Fairway direction over the last 30 minutes, plus ${s.veer}° for the usual veer.`
-    : 'Starting guess from history: the settled breeze is usually from about 355°.';
+    ? `Fairway direction over the last 30 minutes plus ${s.veer}° for the usual veer, give or take ${r.bearing.spread}°.`
+    : 'Starting guess from history: the settled breeze is usually from about 355°. Updates when the breeze settles.';
 
   const origin = s.area === 'gps' ? gps : COURSE_AREAS[s.area];
   if (origin) {
-    const [lat, lon] = destination(origin.lat, origin.lon, r.bearing.bearing, s.leg);
-    $('mark').innerHTML = `<div class="label">Mark position, ${s.leg} nm from ${s.area === 'gps' ? 'your position' : COURSE_AREAS[s.area].name.toLowerCase()}</div>`
-      + `<div><strong>${fmtDDM(lat, true)} &nbsp; ${fmtDDM(lon, false)}</strong></div>`;
+    const lat = fmtDDM(origin.lat, true), lon = fmtDDM(origin.lon, false);
+    $('mark').innerHTML = `<button class="copy" data-copy="${lat}">${lat}</button><br><button class="copy" data-copy="${lon}">${lon}</button>`
+      + `<div class="muted">${s.area === 'gps' ? 'Your position' : COURSE_AREAS[s.area].name}</div>`;
   } else {
-    $('mark').innerHTML = '<div class="muted">Waiting for your position…</div>';
+    $('mark').innerHTML = '<span class="muted">Waiting for your position…</span>';
   }
 
   if (lastStatus && r.status === 'Arriving' && lastStatus !== 'Arriving') navigator.vibrate?.([300, 150, 300]);
@@ -164,6 +168,12 @@ for (const id of ['area', 'leg', 'veer', 'lay', 'seq']) {
 }
 document.querySelectorAll('[data-tap]').forEach(b => b.addEventListener('click', () => tap(b.dataset.tap)));
 $('download').addEventListener('click', downloadLog);
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button.copy');
+  if (!b?.dataset.copy) return;
+  try { await navigator.clipboard.writeText(b.dataset.copy); } catch { return; }
+  b.classList.add('done'); setTimeout(() => b.classList.remove('done'), 1200);
+});
 
 let gpsWatch = null;
 function watchGps() {

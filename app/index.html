@@ -35,6 +35,10 @@
   .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; align-items: center; }
   svg text { fill: var(--muted); font-size: 11px; }
   .err { color: var(--bad); }
+  dl.bz { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; margin: 8px 0; }
+  dl.bz dt { color: var(--muted); font-size: 14px; } dl.bz dd { margin: 0; }
+  button.copy { border: none; background: none; padding: 2px 0; font-weight: 700; text-align: left; }
+  button.copy.big { font-size: 30px; } button.copy.done { color: var(--good); }
   ul.log { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
 </style>
 </head>
@@ -64,10 +68,14 @@
   </section>
 
   <section class="card">
-    <div class="label">Windward mark</div>
-    <div class="big" id="bearing">–</div>
+    <div class="label">For BuoyZone</div>
+    <dl class="bz">
+      <dt>Course axis</dt><dd><button class="copy big" id="bearing">–</button></dd>
+      <dt>Course size</dt><dd><button class="copy" id="size">–</button></dd>
+      <dt>Axis position</dt><dd id="mark">–</dd>
+    </dl>
     <div class="muted" id="bearingNote"></div>
-    <div id="mark" style="margin-top:8px"></div>
+    <div class="muted">Tap a value to copy it.</div>
   </section>
 
   <section class="card">
@@ -94,7 +102,7 @@
     <div class="settings">
       <label for="area">Course area</label>
       <select id="area"><option value="east">Eastern</option><option value="west">Western</option><option value="gps">My position</option></select>
-      <label for="leg">Leg length (nm)</label>
+      <label for="leg">Course size (nm)</label>
       <input id="leg" type="number" min="0.4" max="1.5" step="0.1" value="0.8">
       <label for="veer">Veer allowance (°)</label>
       <input id="veer" type="number" min="0" max="20" step="1" value="8">

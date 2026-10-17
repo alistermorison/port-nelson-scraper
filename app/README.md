@@ -8,6 +8,8 @@ stations from Supabase every 2 minutes and shows:
 - a "For Buoy Zone" panel: course axis, distances to marks 1 (outer, J/111) and 1a (inner,
   Elliott 5.9) sized for a 45-minute race, and start boat position, tap to copy
 - a postponement suggestion when the breeze looks unlikely before 13:00
+- a "Race in the gradient wind" setting: the axis follows the live Fairway wind from any
+  direction (no veer added) and the start is as soon as the marks can be laid
 
 Taps on "What you can see" are kept on the phone for the day and can be downloaded
 as a CSV, so race days can be compared with what the app said.

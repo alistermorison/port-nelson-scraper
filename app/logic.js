@@ -192,9 +192,10 @@ export function recentDirection(bins, n = 3) {
 }
 
 // taps: [{kind, ms}], kinds: 'wind-on-water', 'plume', 'cloud', 'mark-laid', 'breeze-in'
-export function evaluate(bins, { nowMs, taps = [], veer = 8, layMinutes = 15, sequenceMinutes = 5 } = {}) {
+export function evaluate(bins, { nowMs, taps = [], veer = 8, layMinutes = 15, sequenceMinutes = 5, gradientRace = false } = {}) {
   const now = nzParts(nowMs);
   const clim = climatologyFor(now.month);
+  if (gradientRace) return evaluateGradient(bins, { now, clim, layMinutes, sequenceMinutes });
   const morning = morningMean(bins);
   const latest = bins.at(-1) ?? null;
   const settledIdx = findSettled(bins);
@@ -263,6 +264,33 @@ export function evaluate(bins, { nowMs, taps = [], veer = 8, layMinutes = 15, se
   }
 
   return { status, detail, window, start, bearing, postpone, morning, clim, latest, settledIdx, alertIdx };
+}
+
+// Racing in the gradient wind: any direction counts, and the axis is the live
+// Fairway direction with no sea breeze veer added.
+function evaluateGradient(bins, { now, clim, layMinutes, sequenceMinutes }) {
+  const last = bins.slice(-3);
+  const steady = last.length === 3 && consecutive(last[0], last[1]) && consecutive(last[1], last[2])
+    && last.every(b => b.fw != null && b.fw >= MIN_STEADY_KN && b.fd != null);
+  const d = recentDirection(bins, 3);
+  const latest = bins.at(-1) ?? null;
+  const base = { window: null, postpone: null, morning: morningMean(bins), clim, latest, settledIdx: -1, alertIdx: -1 };
+  if (!steady || !d) {
+    return {
+      ...base, status: 'Too light', start: null,
+      detail: 'Racing in the gradient wind, but the Fairway has not held 4 kn for the last 30 minutes.',
+      bearing: d ? { bearing: norm360(Math.round(d.mean)), spread: Math.max(5, Math.round(d.spread)), source: 'gradient' }
+        : { bearing: SETTLED_BEARING, spread: 20, source: 'history' },
+    };
+  }
+  const kn = last.reduce((a, b) => a + b.fw, 0) / 3;
+  const s = now.minutes + layMinutes + sequenceMinutes;
+  return {
+    ...base, status: 'Gradient race',
+    detail: `Racing in the gradient wind: ${kn.toFixed(0)} kn from ${String(norm360(Math.round(d.mean))).padStart(3, '0')}°T at the Fairway.`,
+    start: { start: s, warning: s - sequenceMinutes },
+    bearing: { bearing: norm360(Math.round(d.mean)), spread: Math.max(5, Math.round(d.spread)), source: 'gradient' },
+  };
 }
 
 // Point at a bearing and distance from a start point (nautical miles), on a sphere.

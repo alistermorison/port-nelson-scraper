@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b3d5c">
+<title>Sea Breeze Start · Whakatū Nelson</title>
+<style>
+  :root {
+    --bg: #f4f7f9; --card: #ffffff; --text: #10202b; --muted: #5a6b77; --line: #d8e1e7;
+    --accent: #0b6fa4; --good: #1d7a3e; --warn: #b26a00; --bad: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0d1418; --card: #162228; --text: #e8eef2; --muted: #9fb0bb; --line: #2a3a43;
+      --accent: #5bb6e6; --good: #5cc983; --warn: #f0b04a; --bad: #f2867f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 17px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  main { max-width: 560px; margin: 0 auto; padding: 12px 16px 40px; }
+  h1 { font-size: 18px; margin: 4px 0 12px; color: var(--muted); font-weight: 600; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+  .status { font-size: 40px; font-weight: 800; letter-spacing: -0.5px; }
+  .status.Settled { color: var(--good); } .status.Arriving { color: var(--accent); }
+  .status.Unsettled, .status.Gradient { color: var(--warn); }
+  .detail { color: var(--muted); margin-top: 4px; }
+  .big { font-size: 30px; font-weight: 700; }
+  .label { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .row { display: flex; gap: 12px; } .row > div { flex: 1; }
+  .postpone { border-color: var(--warn); color: var(--warn); font-weight: 600; }
+  .muted { color: var(--muted); font-size: 14px; }
+  button, select, input { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .taps { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .taps button { min-height: 56px; font-weight: 600; }
+  .taps button:active { background: var(--line); }
+  .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; align-items: center; }
+  svg text { fill: var(--muted); font-size: 11px; }
+  .err { color: var(--bad); }
+  dl.bz { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; margin: 8px 0; }
+  dl.bz dt { color: var(--muted); font-size: 14px; } dl.bz dd { margin: 0; }
+  button.copy { border: none; background: none; padding: 2px 0; font-weight: 700; text-align: left; }
+  button.copy.big { font-size: 30px; } button.copy.done { color: var(--good); }
+  ul.log { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sea Breeze Start &middot; Whakatū Nelson &middot; <span id="updated">loading…</span></h1>
+
+  <section class="card">
+    <div class="label">Breeze</div>
+    <div id="status" class="status">…</div>
+    <div id="detail" class="detail"></div>
+  </section>
+
+  <section id="postpone" class="card postpone" hidden></section>
+
+  <section class="card row">
+    <div>
+      <div class="label" id="windowLabel">Expected arrival</div>
+      <div class="big" id="window">–</div>
+      <div class="muted" id="windowNote"></div>
+    </div>
+    <div>
+      <div class="label">Suggested start</div>
+      <div class="big" id="start">–</div>
+      <div class="muted" id="startNote"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="label">For Buoy Zone</div>
+    <dl class="bz">
+      <dt>Course axis</dt><dd><button class="copy big" id="bearing">–</button><div class="muted" id="bearingTrue"></div></dd>
+      <dt>Course size (mark 1, outer)</dt><dd><button class="copy" id="mark1">–</button></dd>
+      <dt>Mark 1a (inner)</dt><dd><button class="copy" id="mark1a">–</button></dd>
+      <dt>Start boat position</dt><dd id="mark">–</dd>
+    </dl>
+    <div class="muted" id="bearingNote"></div>
+    <div class="muted" id="sizeNote"></div>
+    <div class="muted">Course size is the distance from the start to mark 1, which is the number Buoy Zone asks for. Mark 1a is the inner top mark. Tap a value to copy it.</div>
+  </section>
+
+  <section class="card">
+    <div class="label">Last 3 hours (knots)</div>
+    <svg id="chart" viewBox="0 0 520 170" width="100%" role="img" aria-label="Wind at the Fairway and Main Wharf"></svg>
+    <div class="muted">Blue: Fairway. Grey: Main Wharf. Ticks show where the wind blows towards; blue ticks are onshore.</div>
+  </section>
+
+  <section class="card">
+    <div class="label">What you can see</div>
+    <div class="taps">
+      <button data-tap="wind-on-water">Wind on water to the north</button>
+      <button data-tap="plume">Nelson Pine plume leaning south</button>
+      <button data-tap="cloud">Cloud building</button>
+      <button data-tap="breeze-in">Breeze is in (my call)</button>
+      <button data-tap="mark-laid">Windward mark laid</button>
+      <button id="download">Download today's log</button>
+    </div>
+    <ul class="log" id="log"></ul>
+  </section>
+
+  <section class="card">
+    <div class="label">Settings</div>
+    <div class="settings">
+      <label for="area">Course area</label>
+      <select id="area"><option value="east">Eastern</option><option value="west">Western</option><option value="gps">My position</option></select>
+      <label for="sigOuter">Outer course signal</label>
+      <select id="sigOuter"><option value="1">1 (one lap)</option><option value="2" selected>2 (two laps)</option><option value="3">3 (three laps)</option></select>
+      <label for="sigInner">Inner course signal</label>
+      <select id="sigInner"><option value="4">4 (one lap)</option><option value="5" selected>5 (two laps)</option><option value="6">6 (three laps)</option></select>
+      <label for="pctOuter">J/111 speed (%)</label>
+      <input id="pctOuter" type="number" min="60" max="130" step="5" value="100">
+      <label for="pctInner">Elliott 5.9 speed (%)</label>
+      <input id="pctInner" type="number" min="60" max="130" step="5" value="100">
+      <label for="veer">Veer allowance (°)</label>
+      <input id="veer" type="number" min="0" max="20" step="1" value="8">
+      <label for="lay">Time to lay mark (min)</label>
+      <input id="lay" type="number" min="5" max="40" step="1" value="15">
+      <label for="seq">Start sequence (min)</label>
+      <input id="seq" type="number" min="3" max="10" step="1" value="5">
+    </div>
+    <p class="muted">Harbour data from Port Nelson, read every 2 minutes. This version uses the harbour stations only, not the committee boat's instruments. In replays it gave 15 to 90 minutes' warning on about half of sea breeze mornings, so trust your eyes too.</p>
+  </section>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

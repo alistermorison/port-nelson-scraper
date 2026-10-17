@@ -1,0 +1,21 @@
+name: Sea Breeze Start tests
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/app-tests.yml']
+  pull_request:
+    paths: ['app/**', '.github/workflows/app-tests.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test the sea breeze logic
+        run: node --test 'app/*.test.mjs'

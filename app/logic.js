@@ -304,3 +304,8 @@ export function raceWind(bins) {
   const mean = v.length ? v.reduce((s, a) => s + a, 0) / v.length : null;
   return mean != null && mean >= MIN_STEADY_KN ? { kn: mean, source: 'live' } : { kn: TYPICAL_BREEZE_KN, source: 'typical' };
 }
+
+// BuoyZone's course axis is magnetic. Harbour station directions are true.
+// WMM2025 gives 23.0° E at the Fairway for Oct 2026 to Jan 2027, changing by under 0.1° a year.
+export const MAG_VARIATION_E = 23;
+export const toMagnetic = trueDeg => norm360(Math.round(trueDeg - MAG_VARIATION_E));

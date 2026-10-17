@@ -1,5 +1,5 @@
 import {
-  cleanRows, bin10, evaluate, nzParts, fmtMinutes, fmtDDM, POLARS, beatLength, raceWind, TARGET_MINUTES, COURSE_AREAS, isOnshore,
+  cleanRows, bin10, evaluate, nzParts, fmtMinutes, fmtDDM, POLARS, beatLength, raceWind, TARGET_MINUTES, toMagnetic, MAG_VARIATION_E, COURSE_AREAS, isOnshore,
 } from './logic.js';
 
 const SUPABASE_URL = 'https://sffjznjsxcnhetmiipui.supabase.co';
@@ -71,9 +71,11 @@ function render() {
     $('startNote').textContent = 'Wait for a steady breeze.';
   }
 
-  const axis = `${String(r.bearing.bearing).padStart(3, '0')}°`;
-  $('bearing').textContent = axis;
+  const deg3 = d => String(d).padStart(3, '0');
+  const axis = deg3(toMagnetic(r.bearing.bearing));
+  $('bearing').textContent = `${axis}°M`;
   $('bearing').dataset.copy = axis;
+  $('bearingTrue').textContent = `${deg3(r.bearing.bearing)}°T, variation ${MAG_VARIATION_E}° E`;
   const wind = raceWind(bins);
   const m1 = beatLength(POLARS.j111, wind.kn, s.sigOuter, { speedFactor: s.pctOuter / 100 }).nm.toFixed(2);
   const m1a = beatLength(POLARS.e59, wind.kn, s.sigInner, { speedFactor: s.pctInner / 100 }).nm.toFixed(2);
@@ -83,7 +85,7 @@ function render() {
     + (wind.source === 'live' ? `in the ${wind.kn.toFixed(0)} kn now at the Fairway.` : `in a typical ${wind.kn} kn sea breeze until the breeze arrives.`);
   $('bearingNote').textContent = r.bearing.source === 'live'
     ? `Fairway direction over the last 30 minutes plus ${s.veer}° for the usual veer, give or take ${r.bearing.spread}°.`
-    : 'Starting guess from history: the settled breeze is usually from about 355°. Updates when the breeze settles.';
+    : 'Starting guess from history: the settled breeze is usually from about 355°T. Updates when the breeze settles.';
 
   const origin = s.area === 'gps' ? gps : COURSE_AREAS[s.area];
   if (origin) {

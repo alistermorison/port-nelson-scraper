@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   climatologyFor, vectorMean, cleanRows, bin10, findSettled, findAlert, evaluate,
   destination, fmtDDM, fmtMinutes, nzParts, COURSE_AREAS,
-  POLARS, polarAt, COURSE_SIGNALS, beatLength, raceWind, TYPICAL_BREEZE_KN,
+  POLARS, polarAt, COURSE_SIGNALS, beatLength, raceWind, TYPICAL_BREEZE_KN, toMagnetic,
 } from './logic.js';
 
 // 10 Oct 2026 is NZ daylight time (UTC+13), so NZ 00:00 is 11:00 UTC the day before.
@@ -150,4 +150,10 @@ test('beatLength hits the 45-minute target', () => {
 test('raceWind uses live Fairway wind once there is breeze', () => {
   assert.deepEqual(raceWind([{ fw: 2 }, { fw: 3 }, { fw: 2 }]), { kn: TYPICAL_BREEZE_KN, source: 'typical' });
   assert.deepEqual(raceWind([{ fw: 6 }, { fw: 8 }, { fw: 10 }]), { kn: 8, source: 'live' });
+});
+
+test('toMagnetic takes off the 23° east variation', () => {
+  assert.equal(toMagnetic(3), 340);
+  assert.equal(toMagnetic(355), 332);
+  assert.equal(toMagnetic(30), 7);
 });

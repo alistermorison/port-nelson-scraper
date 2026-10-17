@@ -431,3 +431,15 @@ export function forecastHint({ landSea, gradOnshore } = {}) {
   const text = parts.join(', ');
   return { score, text: `Forecast: ${text}. Breeze ${verdict}.` };
 }
+
+// Days when the sea breeze may not come. On 17 of 92 days (Jul–Oct 2026) the forecast
+// had an offshore gradient of 3 kn or more from 09:00 to 13:00 and the breakfast wind
+// at the Fairway was 8 kn or more: the breeze never came on 9 and came after 14:30 on 4.
+export const NO_BREEZE = { offshoreKn: 3, morningKn: 8, days: 17, never: 9, late: 4 };
+export function noBreezeWarning(forecast, morning) {
+  if (forecast?.gradOnshore == null || morning == null) return null;
+  if (forecast.gradOnshore > -NO_BREEZE.offshoreKn || morning < NO_BREEZE.morningKn) return null;
+  const { days, never, late } = NO_BREEZE;
+  return `Breeze may not come today. The forecast has a ${Math.round(-forecast.gradOnshore)} kn offshore gradient through midday and the Fairway averaged ${Math.round(morning)} kn at breakfast. `
+    + `On ${days} days like this since July the sea breeze never came on ${never} and came after 14:30 on ${late}. Consider racing in the gradient wind (see Settings).`;
+}

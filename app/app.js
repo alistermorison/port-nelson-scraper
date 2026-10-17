@@ -50,6 +50,10 @@ function render() {
   $('detail').textContent = r.detail;
 
   const hint = forecast && !s.gradient && r.status !== 'Settled' && r.status !== 'Unsettled' ? forecastHint(forecast) : null;
+  const L = bins.at(-1);
+  const d3 = d => String(Math.round(d)).padStart(3, '0');
+  const stn = (kn, dir) => kn == null || dir == null ? 'no reading' : `${kn.toFixed(0)} kn from ${d3(dir)}°T${isOnshore(dir) ? '' : ', offshore'}`;
+  $('now').textContent = L ? `Now: Fairway ${stn(L.fw, L.fd)}. Main Wharf ${stn(L.mw, L.md)}.` : '';
   $('forecast').hidden = !hint;
   $('forecast').textContent = hint?.text ?? '';
 
@@ -81,7 +85,7 @@ function render() {
   $('bearing').textContent = `${axis}°M`;
   $('bearing').dataset.copy = axis;
   $('bearingTrue').textContent = `${deg3(r.bearing.bearing)}°T, variation ${MAG_VARIATION_E}° E`;
-  const wind = raceWind(bins);
+  const wind = raceWind(bins, { onshoreOnly: !s.gradient });
   const m1 = beatLength(POLARS.j111, wind.kn, s.sigOuter, { speedFactor: s.pctOuter / 100 }).nm.toFixed(2);
   const m1a = beatLength(POLARS.e59, wind.kn, s.sigInner, { speedFactor: s.pctInner / 100 }).nm.toFixed(2);
   $('mark1').textContent = `${m1} nm`; $('mark1').dataset.copy = m1;
@@ -92,7 +96,7 @@ function render() {
     ? `Fairway direction over the last 30 minutes plus ${s.veer}° for the usual veer, give or take ${r.bearing.spread}°.`
     : r.bearing.source === 'gradient'
     ? `Fairway direction over the last 30 minutes, give or take ${r.bearing.spread}°. No veer added in a gradient wind.`
-    : 'Starting guess from history: the settled breeze is usually from about 355°T. Updates when the breeze settles.';
+    : 'Expected sea breeze axis from history (usually about 355°T), not the wind blowing now. Updates when the breeze settles.';
 
   const origin = s.area === 'gps' ? gps : COURSE_AREAS[s.area];
   if (origin) {

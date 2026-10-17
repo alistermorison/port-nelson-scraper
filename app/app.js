@@ -1,6 +1,6 @@
 import {
   cleanRows, bin10, evaluate, nzParts, fmtMinutes, fmtDDM, POLARS, beatLength, raceWind, TARGET_MINUTES, toMagnetic, MAG_VARIATION_E, COURSE_AREAS, isOnshore, setClimatology,
-  summariseForecast, forecastHint, FORECAST_INLAND, FORECAST_SEA,
+  summariseForecast, forecastHint, noBreezeWarning, FORECAST_INLAND, FORECAST_SEA,
 } from './logic.js';
 
 const SUPABASE_URL = 'https://sffjznjsxcnhetmiipui.supabase.co';
@@ -49,7 +49,9 @@ function render() {
   $('status').className = `status ${r.status.split(' ')[0]}`;
   $('detail').textContent = r.detail;
 
-  const hint = forecast && !s.gradient && r.status !== 'Settled' && r.status !== 'Unsettled' ? forecastHint(forecast) : null;
+  const early = !s.gradient && (r.status === 'Waiting' || r.status === 'Building' || r.status === 'Gradient wind');
+  const noBreeze = early ? noBreezeWarning(forecast, r.morning) : null;
+  const hint = forecast && !noBreeze && !s.gradient && r.status !== 'Settled' && r.status !== 'Unsettled' ? forecastHint(forecast) : null;
   const L = bins.at(-1);
   const d3 = d => String(Math.round(d)).padStart(3, '0');
   const stn = (kn, dir) => kn == null || dir == null ? 'no reading' : `${kn.toFixed(0)} kn from ${d3(dir)}°T${isOnshore(dir) ? '' : ', offshore'}`;
@@ -57,8 +59,9 @@ function render() {
   $('forecast').hidden = !hint;
   $('forecast').textContent = hint?.text ?? '';
 
-  $('postpone').hidden = !r.postpone;
-  $('postpone').textContent = r.postpone ?? '';
+  const advice = [noBreeze, r.postpone].filter(Boolean).join(' ');
+  $('postpone').hidden = !advice;
+  $('postpone').textContent = advice;
 
   if (r.window) {
     $('windowLabel').textContent = 'Expected arrival';

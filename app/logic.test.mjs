@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  summariseForecast, forecastHint, climatologyFor, setClimatology, buildClimatology, CLIMATOLOGY, vectorMean, cleanRows, bin10, findSettled, findAlert, evaluate,
+  noBreezeWarning, summariseForecast, forecastHint, climatologyFor, setClimatology, buildClimatology, CLIMATOLOGY, vectorMean, cleanRows, bin10, findSettled, findAlert, evaluate,
   destination, fmtDDM, fmtMinutes, nzParts, COURSE_AREAS,
   POLARS, polarAt, COURSE_SIGNALS, beatLength, raceWind, TYPICAL_BREEZE_KN, toMagnetic,
 } from './logic.js';
@@ -239,4 +239,11 @@ test('raceWind ignores an offshore wind before the sea breeze', () => {
   assert.equal(raceWind(southerly).source, 'live');
   assert.deepEqual(raceWind(southerly, { onshoreOnly: true }), { kn: TYPICAL_BREEZE_KN, source: 'typical' });
   assert.equal(raceWind(day(() => ({ fw: 11, fd: 355 })), { onshoreOnly: true }).source, 'live');
+});
+
+test('warns that the breeze may not come on a strong offshore gradient day', () => {
+  assert.match(noBreezeWarning({ gradOnshore: -4.2 }, 9.6), /may not come.*4 kn offshore.*10 kn at breakfast.*never came on 9/);
+  assert.equal(noBreezeWarning({ gradOnshore: -4.2 }, 5), null);   // light breakfast wind
+  assert.equal(noBreezeWarning({ gradOnshore: -1 }, 12), null);    // little gradient forecast
+  assert.equal(noBreezeWarning(null, 12), null);
 });

@@ -243,3 +243,64 @@ export const COURSE_AREAS = {
   east: { name: 'Eastern area', lat: -(41 + 14.4 / 60), lon: 173 + 16.186 / 60 },
   west: { name: 'Western area', lat: -(41 + 14.37 / 60), lon: 173 + 12.62 / 60 },
 };
+
+// Median ORC VPP figures (knots) from 2022–24 certificates, via github.com/jieter/orc-data.
+// No Elliott 5.9 or Flying Fifteen certificates exist, so the SB20 stands in for the
+// inner course until race results let us correct it with the speed setting.
+export const POLARS = {
+  j111: {
+    name: 'J/111', tws: [6, 8, 10, 12, 14, 16, 20],
+    beat: [3.84, 4.7, 5.21, 5.42, 5.52, 5.6, 5.67],
+    run: [4.08, 5.16, 6.08, 6.68, 7.08, 7.56, 9.09],
+    reach: [6.68, 7.53, 7.96, 8.24, 8.49, 8.78, 9.2],
+  },
+  e59: {
+    name: 'Elliott 5.9 (SB20 figures)', tws: [6, 8, 10, 12, 14, 16, 20],
+    beat: [3.08, 3.7, 4.07, 4.19, 4.22, 4.23, 4.23],
+    run: [3.54, 4.41, 4.95, 5.4, 5.94, 6.66, 9.47],
+    reach: [5.25, 5.86, 6.16, 6.55, 6.98, 7.38, 7.86],
+  },
+};
+
+// Interpolate a polar row at a wind speed, holding the end values outside the table.
+export function polarAt(p, key, tws) {
+  const xs = p.tws, ys = p[key];
+  if (tws <= xs[0]) return ys[0];
+  for (let i = 1; i < xs.length; i++) {
+    if (tws <= xs[i]) return ys[i - 1] + (ys[i] - ys[i - 1]) * (tws - xs[i - 1]) / (xs[i] - xs[i - 1]);
+  }
+  return ys.at(-1);
+}
+
+// Legs per course signal in the 2027 Nelson Regatta SIs, Attachment A, in units of the
+// beat length. Outer: Start–1–2–(3–2)–Finish, with the 1→2 reach taken as half a beat.
+// Inner: Start–1a–(4–1a)–Finish.
+export const COURSE_SIGNALS = {
+  1: { course: 'outer', beats: 1, runs: 1, reaches: 0.5 },
+  2: { course: 'outer', beats: 2, runs: 2, reaches: 0.5 },
+  3: { course: 'outer', beats: 3, runs: 3, reaches: 0.5 },
+  4: { course: 'inner', beats: 1, runs: 1, reaches: 0 },
+  5: { course: 'inner', beats: 2, runs: 2, reaches: 0 },
+  6: { course: 'inner', beats: 3, runs: 3, reaches: 0 },
+};
+export const TARGET_MINUTES = 45;
+
+// Distance from the start to the windward mark (nm) so the leading boat takes the
+// target time. speedFactor scales the polar (1 = as published).
+export function beatLength(polar, tws, signal, { targetMinutes = TARGET_MINUTES, speedFactor = 1 } = {}) {
+  const c = COURSE_SIGNALS[signal];
+  const up = polarAt(polar, 'beat', tws) * speedFactor;
+  const down = polarAt(polar, 'run', tws) * speedFactor;
+  const reach = polarAt(polar, 'reach', tws) * speedFactor;
+  const hoursPerNm = c.beats / up + c.runs / down + c.reaches / reach;
+  return { nm: (targetMinutes / 60) / hoursPerNm, up, down };
+}
+
+// Wind speed to plan the course on: the Fairway mean over the last 30 minutes once
+// there is breeze, otherwise the typical settled sea breeze.
+export const TYPICAL_BREEZE_KN = 9;
+export function raceWind(bins) {
+  const v = bins.slice(-3).map(b => b.fw).filter(x => x != null);
+  const mean = v.length ? v.reduce((s, a) => s + a, 0) / v.length : null;
+  return mean != null && mean >= MIN_STEADY_KN ? { kn: mean, source: 'live' } : { kn: TYPICAL_BREEZE_KN, source: 'typical' };
+}

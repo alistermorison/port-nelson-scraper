@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   climatologyFor, vectorMean, cleanRows, bin10, findSettled, findAlert, evaluate,
   destination, fmtDDM, fmtMinutes, nzParts, COURSE_AREAS,
+  POLARS, polarAt, COURSE_SIGNALS, beatLength, raceWind, TYPICAL_BREEZE_KN,
 } from './logic.js';
 
 // 10 Oct 2026 is NZ daylight time (UTC+13), so NZ 00:00 is 11:00 UTC the day before.
@@ -124,4 +125,29 @@ test('a wind-on-water tap raises the alert', () => {
   const r = evaluate(calm.filter(x => x.minutes < 600), { nowMs: now, taps: [{ kind: 'wind-on-water', ms: now - 5 * 60000 }] });
   assert.equal(r.status, 'Arriving');
   assert.match(r.detail, /You reported/);
+});
+
+test('polarAt interpolates and holds the ends', () => {
+  const p = POLARS.j111;
+  assert.equal(polarAt(p, 'beat', 4), 3.84);
+  assert.equal(polarAt(p, 'beat', 25), 5.67);
+  assert.ok(Math.abs(polarAt(p, 'beat', 9) - (4.7 + 5.21) / 2) < 1e-9);
+});
+
+test('beatLength hits the 45-minute target', () => {
+  for (const [boat, signal] of [['e59', 5], ['j111', 2], ['e59', 4], ['j111', 3]]) {
+    const p = POLARS[boat], c = COURSE_SIGNALS[signal];
+    const { nm } = beatLength(p, 10, signal);
+    const minutes = 60 * nm * (c.beats / polarAt(p, 'beat', 10) + c.runs / polarAt(p, 'run', 10) + c.reaches / polarAt(p, 'reach', 10));
+    assert.ok(Math.abs(minutes - 45) < 1e-9, `${boat} signal ${signal}`);
+  }
+  // Two laps of the inner course in 10 kn: about 0.8 nm for an SB20-speed boat.
+  assert.ok(Math.abs(beatLength(POLARS.e59, 10, 5).nm - 0.84) < 0.02);
+  // Slower boats get a shorter course.
+  assert.ok(beatLength(POLARS.e59, 10, 5, { speedFactor: 0.9 }).nm < beatLength(POLARS.e59, 10, 5).nm);
+});
+
+test('raceWind uses live Fairway wind once there is breeze', () => {
+  assert.deepEqual(raceWind([{ fw: 2 }, { fw: 3 }, { fw: 2 }]), { kn: TYPICAL_BREEZE_KN, source: 'typical' });
+  assert.deepEqual(raceWind([{ fw: 6 }, { fw: 8 }, { fw: 10 }]), { kn: 8, source: 'live' });
 });

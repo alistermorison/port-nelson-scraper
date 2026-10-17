@@ -1,5 +1,5 @@
 import {
-  cleanRows, bin10, evaluate, nzParts, fmtMinutes, fmtDDM, COURSE_AREAS, isOnshore,
+  cleanRows, bin10, evaluate, nzParts, fmtMinutes, fmtDDM, POLARS, beatLength, raceWind, TARGET_MINUTES, COURSE_AREAS, isOnshore,
 } from './logic.js';
 
 const SUPABASE_URL = 'https://sffjznjsxcnhetmiipui.supabase.co';
@@ -33,7 +33,11 @@ async function fetchRows() {
 
 function settings() {
   const num = (id, d) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : d; };
-  return { area: $('area').value, leg: num('leg', 0.8), veer: num('veer', 8), lay: num('lay', 15), seq: num('seq', 5) };
+  return {
+    area: $('area').value, veer: num('veer', 8), lay: num('lay', 15), seq: num('seq', 5),
+    sigOuter: +$('sigOuter').value, sigInner: +$('sigInner').value,
+    pctOuter: num('pctOuter', 100), pctInner: num('pctInner', 100),
+  };
 }
 
 function render() {
@@ -70,8 +74,13 @@ function render() {
   const axis = `${String(r.bearing.bearing).padStart(3, '0')}°`;
   $('bearing').textContent = axis;
   $('bearing').dataset.copy = axis;
-  $('size').textContent = `${s.leg} nm`;
-  $('size').dataset.copy = String(s.leg);
+  const wind = raceWind(bins);
+  const m1 = beatLength(POLARS.j111, wind.kn, s.sigOuter, { speedFactor: s.pctOuter / 100 }).nm.toFixed(2);
+  const m1a = beatLength(POLARS.e59, wind.kn, s.sigInner, { speedFactor: s.pctInner / 100 }).nm.toFixed(2);
+  $('mark1').textContent = `${m1} nm`; $('mark1').dataset.copy = m1;
+  $('mark1a').textContent = `${m1a} nm`; $('mark1a').dataset.copy = m1a;
+  $('sizeNote').textContent = `Sized for a ${TARGET_MINUTES}-minute race for the leading boat: J/111 on signal ${s.sigOuter}, Elliott 5.9 on signal ${s.sigInner}, `
+    + (wind.source === 'live' ? `in the ${wind.kn.toFixed(0)} kn now at the Fairway.` : `in a typical ${wind.kn} kn sea breeze until the breeze arrives.`);
   $('bearingNote').textContent = r.bearing.source === 'live'
     ? `Fairway direction over the last 30 minutes plus ${s.veer}° for the usual veer, give or take ${r.bearing.spread}°.`
     : 'Starting guess from history: the settled breeze is usually from about 355°. Updates when the breeze settles.';
@@ -161,7 +170,7 @@ async function refresh() {
   render();
 }
 
-for (const id of ['area', 'leg', 'veer', 'lay', 'seq']) {
+for (const id of ['area', 'sigOuter', 'sigInner', 'pctOuter', 'pctInner', 'veer', 'lay', 'seq']) {
   const saved = store.get(`setting-${id}`, null);
   if (saved != null) $(id).value = saved;
   $(id).addEventListener('change', () => { store.set(`setting-${id}`, $(id).value); watchGps(); render(); });

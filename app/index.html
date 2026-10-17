@@ -71,11 +71,13 @@
     <div class="label">For BuoyZone</div>
     <dl class="bz">
       <dt>Course axis</dt><dd><button class="copy big" id="bearing">–</button></dd>
-      <dt>Course size</dt><dd><button class="copy" id="size">–</button></dd>
+      <dt>Mark 1 (outer)</dt><dd><button class="copy" id="mark1">–</button></dd>
+      <dt>Mark 1a (inner)</dt><dd><button class="copy" id="mark1a">–</button></dd>
       <dt>Axis position</dt><dd id="mark">–</dd>
     </dl>
     <div class="muted" id="bearingNote"></div>
-    <div class="muted">Tap a value to copy it.</div>
+    <div class="muted" id="sizeNote"></div>
+    <div class="muted">Distances are from the start to the mark. Tap a value to copy it.</div>
   </section>
 
   <section class="card">
@@ -102,8 +104,14 @@
     <div class="settings">
       <label for="area">Course area</label>
       <select id="area"><option value="east">Eastern</option><option value="west">Western</option><option value="gps">My position</option></select>
-      <label for="leg">Course size (nm)</label>
-      <input id="leg" type="number" min="0.4" max="1.5" step="0.1" value="0.8">
+      <label for="sigOuter">Outer course signal</label>
+      <select id="sigOuter"><option value="1">1 (one lap)</option><option value="2" selected>2 (two laps)</option><option value="3">3 (three laps)</option></select>
+      <label for="sigInner">Inner course signal</label>
+      <select id="sigInner"><option value="4">4 (one lap)</option><option value="5" selected>5 (two laps)</option><option value="6">6 (three laps)</option></select>
+      <label for="pctOuter">J/111 speed (%)</label>
+      <input id="pctOuter" type="number" min="60" max="130" step="5" value="100">
+      <label for="pctInner">Elliott 5.9 speed (%)</label>
+      <input id="pctInner" type="number" min="60" max="130" step="5" value="100">
       <label for="veer">Veer allowance (°)</label>
       <input id="veer" type="number" min="0" max="20" step="1" value="8">
       <label for="lay">Time to lay mark (min)</label>

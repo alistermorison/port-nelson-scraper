@@ -186,3 +186,21 @@ test('buildClimatology rebuilds the monthly table from whole days', () => {
   assert.equal(climatologyFor(11).p50, 660);
   setClimatology(before);
 });
+
+test('gradient race mode uses the live wind from any direction', () => {
+  const southerly = day(() => ({ fw: 9, fd: 200 }));
+  const sea = evaluate(southerly, { nowMs: at(770) });
+  assert.notEqual(sea.status, 'Settled');
+  assert.equal(sea.bearing.source, 'history');
+
+  const r = evaluate(southerly, { nowMs: at(770), gradientRace: true, layMinutes: 15, sequenceMinutes: 5 });
+  assert.equal(r.status, 'Gradient race');
+  assert.equal(r.bearing.bearing, 200);            // no veer added
+  assert.equal(r.bearing.source, 'gradient');
+  assert.equal(r.start.start, 790);
+  assert.equal(r.postpone, null);
+
+  const light = evaluate(day(() => ({ fw: 2, fd: 200 })), { nowMs: at(770), gradientRace: true });
+  assert.equal(light.status, 'Too light');
+  assert.equal(light.start, null);
+});

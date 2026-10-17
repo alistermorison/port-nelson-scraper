@@ -34,7 +34,7 @@ async function fetchRows() {
 function settings() {
   const num = (id, d) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : d; };
   return {
-    area: $('area').value, veer: num('veer', 8), lay: num('lay', 15), seq: num('seq', 5),
+    area: $('area').value, gradient: $('mode').value === 'gradient', veer: num('veer', 8), lay: num('lay', 15), seq: num('seq', 5),
     sigOuter: +$('sigOuter').value, sigInner: +$('sigInner').value,
     pctOuter: num('pctOuter', 100), pctInner: num('pctInner', 100),
   };
@@ -42,7 +42,7 @@ function settings() {
 
 function render() {
   const s = settings();
-  const r = evaluate(bins, { nowMs: Date.now(), taps: getTaps(), veer: s.veer, layMinutes: s.lay, sequenceMinutes: s.seq });
+  const r = evaluate(bins, { nowMs: Date.now(), taps: getTaps(), veer: s.veer, layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient });
 
   $('status').textContent = r.status;
   $('status').className = `status ${r.status.split(' ')[0]}`;
@@ -60,7 +60,7 @@ function render() {
   } else {
     $('windowLabel').textContent = 'Breeze arrived';
     $('window').textContent = r.settledIdx >= 0 ? fmtMinutes(bins[r.settledIdx].minutes) : '–';
-    $('windowNote').textContent = '4 kn or more onshore for 30 minutes at the Fairway.';
+    $('windowNote').textContent = s.gradient ? 'Sea breeze timing is off while racing in the gradient wind.' : '4 kn or more onshore for 30 minutes at the Fairway.';
   }
 
   if (r.start) {
@@ -68,7 +68,7 @@ function render() {
     $('startNote').textContent = `Warning signal ${fmtMinutes(r.start.warning)}${r.start.provisional ? '. Provisional until the breeze settles.' : '.'}`;
   } else {
     $('start').textContent = '–';
-    $('startNote').textContent = 'Wait for a steady breeze.';
+    $('startNote').textContent = s.gradient ? 'Wait for 30 minutes of 4 kn or more.' : 'Wait for a steady breeze.';
   }
 
   const deg3 = d => String(d).padStart(3, '0');
@@ -82,9 +82,11 @@ function render() {
   $('mark1').textContent = `${m1} nm`; $('mark1').dataset.copy = m1;
   $('mark1a').textContent = `${m1a} nm`; $('mark1a').dataset.copy = m1a;
   $('sizeNote').textContent = `Sized for a ${TARGET_MINUTES}-minute race for the leading boat: J/111 on signal ${s.sigOuter}, Elliott 5.9 on signal ${s.sigInner}, `
-    + (wind.source === 'live' ? `in the ${wind.kn.toFixed(0)} kn now at the Fairway.` : `in a typical ${wind.kn} kn sea breeze until the breeze arrives.`);
+    + (wind.source === 'live' ? `in the ${wind.kn.toFixed(0)} kn now at the Fairway.` : s.gradient ? `in a typical ${wind.kn} kn until the wind fills in.` : `in a typical ${wind.kn} kn sea breeze until the breeze arrives.`);
   $('bearingNote').textContent = r.bearing.source === 'live'
     ? `Fairway direction over the last 30 minutes plus ${s.veer}° for the usual veer, give or take ${r.bearing.spread}°.`
+    : r.bearing.source === 'gradient'
+    ? `Fairway direction over the last 30 minutes, give or take ${r.bearing.spread}°. No veer added in a gradient wind.`
     : 'Starting guess from history: the settled breeze is usually from about 355°T. Updates when the breeze settles.';
 
   const origin = s.area === 'gps' ? gps : COURSE_AREAS[s.area];
@@ -146,7 +148,7 @@ function renderLog() {
 function tap(kind) {
   const taps = getTaps();
   const s = settings();
-  const r = evaluate(bins, { nowMs: Date.now(), taps, veer: s.veer, layMinutes: s.lay, sequenceMinutes: s.seq });
+  const r = evaluate(bins, { nowMs: Date.now(), taps, veer: s.veer, layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient });
   taps.push({ kind, ms: Date.now(), status: r.status, bearing: r.bearing.bearing, fw: r.latest?.fw ?? null, fd: r.latest?.fd ?? null });
   store.set(todayKey(), taps);
   render();
@@ -172,7 +174,7 @@ async function refresh() {
   render();
 }
 
-for (const id of ['area', 'sigOuter', 'sigInner', 'pctOuter', 'pctInner', 'veer', 'lay', 'seq']) {
+for (const id of ['mode', 'area', 'sigOuter', 'sigInner', 'pctOuter', 'pctInner', 'veer', 'lay', 'seq']) {
   const saved = store.get(`setting-${id}`, null);
   if (saved != null) $(id).value = saved;
   $(id).addEventListener('change', () => { store.set(`setting-${id}`, $(id).value); watchGps(); render(); });

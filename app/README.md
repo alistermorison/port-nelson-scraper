@@ -1,4 +1,4 @@
-# Sea Breeze Start
+# Sea Breeze Start · Whakatū Nelson
 
 A phone page for the race officer near the Fairway Beacon. It reads the harbour
 stations from Supabase every 2 minutes and shows:

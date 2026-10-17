@@ -143,7 +143,7 @@ export function bin10(rows) {
     };
     const p = nzParts(t);
     return {
-      t, minutes: p.minutes,
+      t, minutes: p.minutes, day: `${p.year}-${p.month}-${p.day}`,
       fw: avg('fairway_wind'), mw: avg('main_wharf_wind'),
       fd: vectorMean(xs.map(x => [x.fairway_wind, x.fairway_dir])),
       md: vectorMean(xs.map(x => [x.main_wharf_wind, x.main_wharf_dir])),
@@ -194,6 +194,10 @@ export function recentDirection(bins, n = 3) {
 // taps: [{kind, ms}], kinds: 'wind-on-water', 'plume', 'cloud', 'mark-laid', 'breeze-in'
 export function evaluate(bins, { nowMs, taps = [], veer = 8, layMinutes = 15, sequenceMinutes = 5, gradientRace = false } = {}) {
   const now = nzParts(nowMs);
+  // Only today's readings count: in the early morning the page also holds last
+  // evening's, and an evening sea breeze must not read as this morning's.
+  const today = `${now.year}-${now.month}-${now.day}`;
+  bins = bins.filter(b => b.day == null || b.day === today);
   const clim = climatologyFor(now.month);
   if (gradientRace) return evaluateGradient(bins, { now, clim, layMinutes, sequenceMinutes });
   const morning = morningMean(bins);
@@ -263,7 +267,8 @@ export function evaluate(bins, { nowMs, taps = [], veer = 8, layMinutes = 15, se
     }
   }
 
-  return { status, detail, window, start, bearing, postpone, morning, clim, latest, settledIdx, alertIdx };
+  const settledAt = settledIdx >= 0 ? bins[settledIdx].minutes : null;
+  return { status, detail, window, start, bearing, postpone, morning, clim, latest, settledIdx, settledAt, alertIdx };
 }
 
 // Racing in the gradient wind: any direction counts, and the axis is the live
@@ -274,7 +279,7 @@ function evaluateGradient(bins, { now, clim, layMinutes, sequenceMinutes }) {
     && last.every(b => b.fw != null && b.fw >= MIN_STEADY_KN && b.fd != null);
   const d = recentDirection(bins, 3);
   const latest = bins.at(-1) ?? null;
-  const base = { window: null, postpone: null, morning: morningMean(bins), clim, latest, settledIdx: -1, alertIdx: -1 };
+  const base = { window: null, postpone: null, morning: morningMean(bins), clim, latest, settledIdx: -1, settledAt: null, alertIdx: -1 };
   if (!steady || !d) {
     return {
       ...base, status: 'Too light', start: null,

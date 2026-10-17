@@ -64,7 +64,7 @@ function render() {
       : `Most likely about ${fmtMinutes(r.window.typical)}.`;
   } else {
     $('windowLabel').textContent = 'Breeze arrived';
-    $('window').textContent = r.settledIdx >= 0 ? fmtMinutes(bins[r.settledIdx].minutes) : '–';
+    $('window').textContent = r.settledAt != null ? fmtMinutes(r.settledAt) : '–';
     $('windowNote').textContent = s.gradient ? 'Sea breeze timing is off while racing in the gradient wind.' : '4 kn or more onshore for 30 minutes at the Fairway.';
   }
 

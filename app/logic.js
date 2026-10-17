@@ -379,3 +379,47 @@ export function raceWind(bins) {
 // WMM2025 gives 23.0° E at the Fairway for Oct 2026 to Jan 2027, changing by under 0.1° a year.
 export const MAG_VARIATION_E = 23;
 export const toMagnetic = trueDeg => norm360(Math.round(trueDeg - MAG_VARIATION_E));
+
+// Forecast hint from Open-Meteo. Tested on 71 light mornings, Jul–Oct 2026: land
+// barely warmer than the sea gave a breeze by 13:00 on 26% of mornings, 2.5° or more
+// on 68%; a slight onshore gradient (09:00–13:00) on 72%, calm or offshore on about 37%.
+export const FORECAST_INLAND = { lat: -41.38, lon: 173.12 }; // Waimea plains
+export const FORECAST_SEA = { lat: -41.15, lon: 173.30 };    // Tasman Bay
+
+// weather: Open-Meteo forecast JSON (daily temperature_2m_max, hourly wind_speed_10m and
+// wind_direction_10m in knots, local times); marine: marine JSON (hourly sea_surface_temperature).
+export function summariseForecast(weather, marine, date) {
+  const di = weather?.daily?.time?.indexOf(date) ?? -1;
+  const tmax = di >= 0 ? weather.daily.temperature_2m_max[di] : null;
+  const H = weather?.hourly ?? { time: [] };
+  const on = [];
+  H.time.forEach((t, i) => {
+    const h = +t.slice(11, 13);
+    if (t.startsWith(date) && h >= 9 && h < 13 && H.wind_speed_10m[i] != null && H.wind_direction_10m[i] != null)
+      on.push(H.wind_speed_10m[i] * Math.cos(rad(H.wind_direction_10m[i] - ONSHORE_AXIS)));
+  });
+  const M = marine?.hourly ?? { time: [] };
+  const sea = M.time.map((t, i) => t.startsWith(date) ? M.sea_surface_temperature[i] : null).filter(v => v != null);
+  const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
+  const sst = mean(sea);
+  return { tmax, sst, landSea: tmax != null && sst != null ? tmax - sst : null, gradOnshore: mean(on) };
+}
+
+export function forecastHint({ landSea, gradOnshore } = {}) {
+  if (landSea == null && gradOnshore == null) return null;
+  let score = 0; const parts = [];
+  if (landSea != null) {
+    const d = Math.round(landSea);
+    if (landSea >= 2.5) { score++; parts.push(`land ${d}° warmer than the sea`); }
+    else if (landSea < 1.2) { score--; parts.push(landSea < 0.5 ? 'land no warmer than the sea' : 'land barely warmer than the sea'); }
+    else parts.push(`land ${d}° warmer than the sea`);
+  }
+  if (gradOnshore != null) {
+    if (gradOnshore >= 0.5) { score++; parts.push('light onshore gradient'); }
+    else if (gradOnshore <= -1.5) { score--; parts.push('offshore gradient'); }
+    else parts.push('little gradient wind');
+  }
+  const verdict = score >= 1 ? 'likely before 13:00' : score <= -1 ? 'likely late, often after 13:00' : 'about usual for the month';
+  const text = parts.join(', ');
+  return { score, text: `Forecast: ${text}. Breeze ${verdict}.` };
+}

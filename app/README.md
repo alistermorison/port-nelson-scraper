@@ -23,3 +23,10 @@ every night by `.github/workflows/climatology.yml`, which runs `build-climatolog
 over all harbour data and commits `climatology.json`. The page loads that file and
 falls back to the table in `logic.js` if it is missing. A month needs at least 8 light
 mornings before it gets its own numbers; until then it borrows the nearest month's.
+
+Before the breeze settles, the Breeze card also shows a forecast line from Open-Meteo
+(no key needed): the forecast inland top temperature against the Tasman Bay sea
+temperature, and the gradient wind from 09:00 to 13:00. On 71 light mornings from July
+to October 2026, land 2.5° or more warmer than the sea gave a breeze by 13:00 on 68% of
+mornings (26% when barely warmer), and a slight onshore gradient on 72% (about 37% when
+calm or offshore). Re-check these thresholds once summer data is in.

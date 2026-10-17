@@ -1,5 +1,6 @@
 import {
   cleanRows, bin10, evaluate, nzParts, fmtMinutes, fmtDDM, POLARS, beatLength, raceWind, TARGET_MINUTES, toMagnetic, MAG_VARIATION_E, COURSE_AREAS, isOnshore, setClimatology,
+  summariseForecast, forecastHint, FORECAST_INLAND, FORECAST_SEA,
 } from './logic.js';
 
 const SUPABASE_URL = 'https://sffjznjsxcnhetmiipui.supabase.co';
@@ -47,6 +48,10 @@ function render() {
   $('status').textContent = r.status;
   $('status').className = `status ${r.status.split(' ')[0]}`;
   $('detail').textContent = r.detail;
+
+  const hint = forecast && !s.gradient && r.status !== 'Settled' && r.status !== 'Unsettled' ? forecastHint(forecast) : null;
+  $('forecast').hidden = !hint;
+  $('forecast').textContent = hint?.text ?? '';
 
   $('postpone').hidden = !r.postpone;
   $('postpone').textContent = r.postpone ?? '';
@@ -163,6 +168,7 @@ function downloadLog() {
 }
 
 async function refresh() {
+  loadForecast().then(render);
   try {
     bins = bin10(cleanRows(await fetchRows()));
     $('updated').textContent = bins.length ? `updated ${fmtMinutes(nzParts(Date.now()).minutes)}` : 'no data yet today';
@@ -196,6 +202,21 @@ function watchGps() {
     () => { $('mark').innerHTML = '<div class="err">Location not available. Pick a course area instead.</div>'; },
     { enableHighAccuracy: true, maximumAge: 30000 },
   );
+}
+
+// Today's Open-Meteo forecast: inland top temperature, sea temperature and the gradient wind.
+let forecast = null, forecastDate = null, forecastAt = 0;
+async function loadForecast() {
+  const p = nzParts(Date.now()), date = `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+  if (forecastDate === date && Date.now() - forecastAt < 3600e3) return;
+  try {
+    const q = (pt, rest) => `latitude=${pt.lat}&longitude=${pt.lon}&timezone=Pacific%2FAuckland&forecast_days=1&${rest}`;
+    const [w, m] = await Promise.all([
+      fetch(`https://api.open-meteo.com/v1/forecast?${q(FORECAST_INLAND, 'daily=temperature_2m_max&hourly=wind_speed_10m,wind_direction_10m&wind_speed_unit=kn')}`).then(r => r.ok ? r.json() : null),
+      fetch(`https://marine-api.open-meteo.com/v1/marine?${q(FORECAST_SEA, 'hourly=sea_surface_temperature')}`).then(r => r.ok ? r.json() : null),
+    ]);
+    if (w) { forecast = summariseForecast(w, m, date); forecastDate = date; forecastAt = Date.now(); }
+  } catch { /* offline: no forecast line */ }
 }
 
 // The history is rebuilt nightly from all harbour data; the built-in table is the fallback.

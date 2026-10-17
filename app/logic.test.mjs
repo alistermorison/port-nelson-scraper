@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  climatologyFor, setClimatology, buildClimatology, CLIMATOLOGY, vectorMean, cleanRows, bin10, findSettled, findAlert, evaluate,
+  summariseForecast, forecastHint, climatologyFor, setClimatology, buildClimatology, CLIMATOLOGY, vectorMean, cleanRows, bin10, findSettled, findAlert, evaluate,
   destination, fmtDDM, fmtMinutes, nzParts, COURSE_AREAS,
   POLARS, polarAt, COURSE_SIGNALS, beatLength, raceWind, TYPICAL_BREEZE_KN, toMagnetic,
 } from './logic.js';
@@ -203,4 +203,23 @@ test('gradient race mode uses the live wind from any direction', () => {
   const light = evaluate(day(() => ({ fw: 2, fd: 200 })), { nowMs: at(770), gradientRace: true });
   assert.equal(light.status, 'Too light');
   assert.equal(light.start, null);
+});
+
+test('forecast summary and hint', () => {
+  const weather = {
+    daily: { time: ['2026-10-18'], temperature_2m_max: [19] },
+    hourly: {
+      time: ['2026-10-18T08:00', '2026-10-18T09:00', '2026-10-18T10:00', '2026-10-18T11:00', '2026-10-18T12:00', '2026-10-18T13:00'],
+      wind_speed_10m: [9, 2, 2, 2, 2, 9], wind_direction_10m: [180, 355, 355, 355, 355, 180],
+    },
+  };
+  const marine = { hourly: { time: ['2026-10-18T00:00', '2026-10-18T12:00', '2026-10-19T00:00'], sea_surface_temperature: [15, 16, 20] } };
+  const f = summariseForecast(weather, marine, '2026-10-18');
+  assert.equal(f.sst, 15.5);
+  assert.equal(f.landSea, 3.5);
+  assert.ok(Math.abs(f.gradOnshore - 2) < 1e-9); // only 09:00–12:00 counts
+  assert.match(forecastHint(f).text, /likely before 13:00/);
+  assert.match(forecastHint({ landSea: 0.2, gradOnshore: -3 }).text, /no warmer.*offshore.*after 13:00/);
+  assert.match(forecastHint({ landSea: 3, gradOnshore: -3 }).text, /about usual/);
+  assert.equal(forecastHint({}), null);
 });

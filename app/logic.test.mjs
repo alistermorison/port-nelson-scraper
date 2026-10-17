@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  climatologyFor, vectorMean, cleanRows, bin10, findSettled, findAlert, evaluate,
+  climatologyFor, setClimatology, buildClimatology, CLIMATOLOGY, vectorMean, cleanRows, bin10, findSettled, findAlert, evaluate,
   destination, fmtDDM, fmtMinutes, nzParts, COURSE_AREAS,
   POLARS, polarAt, COURSE_SIGNALS, beatLength, raceWind, TYPICAL_BREEZE_KN, toMagnetic,
 } from './logic.js';
@@ -156,4 +156,33 @@ test('toMagnetic takes off the 23° east variation', () => {
   assert.equal(toMagnetic(3), 340);
   assert.equal(toMagnetic(355), 332);
   assert.equal(toMagnetic(30), 7);
+});
+
+test('buildClimatology rebuilds the monthly table from whole days', () => {
+  const full = fn => bin10(cleanRows(rows(360, 960, fn)));
+  const breeze = full(seaBreeze);                       // settles 11:00
+  const late = full(m => seaBreeze(m - 150));           // settles 13:30
+  const none = full(() => ({ fw: 3, fd: 180 }));        // no breeze
+  const windy = full(m => m < 540 ? { fw: 15, fd: 200 } : seaBreeze(m)); // gradient morning, skipped
+  const short = bin10(cleanRows(rows(360, 780, seaBreeze)));             // too few readings, skipped
+  const days = [
+    ...Array(6).fill({ month: 11, bins: breeze }), ...Array(2).fill({ month: 11, bins: late }),
+    ...Array(2).fill({ month: 11, bins: none }), { month: 11, bins: windy }, { month: 11, bins: short },
+    ...Array(3).fill({ month: 12, bins: breeze }), // too few days for December
+  ];
+  const c = buildClimatology(days);
+  assert.deepEqual(Object.keys(c), ['11']);
+  assert.equal(c[11].days, 10);
+  assert.equal(c[11].chance, 0.8);
+  assert.equal(c[11].before13, 0.6);
+  assert.equal(c[11].p50, 660);
+  assert.equal(c[11].p75, 698); // between 11:00 and 13:30, a quarter of the way
+
+  const before = structuredClone(CLIMATOLOGY);
+  setClimatology(c);
+  assert.equal(climatologyFor(11).fallback, false);
+  assert.equal(climatologyFor(1).month, 11);
+  setClimatology({});              // empty input keeps the current table
+  assert.equal(climatologyFor(11).p50, 660);
+  setClimatology(before);
 });

@@ -23,6 +23,48 @@ export const CLIMATOLOGY = {
 // and the middle half of useful warnings fell 15 to 75 min ahead.
 export const ALERT_LEAD = { early: 15, typical: 40, late: 75 };
 
+// Replace the table above with one rebuilt from all data (climatology.json).
+export function setClimatology(months) {
+  if (!months || !Object.keys(months).length) return;
+  for (const k of Object.keys(CLIMATOLOGY)) delete CLIMATOLOGY[k];
+  for (const [k, v] of Object.entries(months)) CLIMATOLOGY[k] = v;
+}
+
+const MIN_DAY_BINS = 30; // a day needs at least 5 hours of readings between 09:00 and 16:00 to count
+export const MIN_MONTH_DAYS = 8; // fewer usable mornings than this and the month borrows from its neighbour
+
+const quantile = (sorted, q) => {
+  const i = (sorted.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+};
+
+// Build the monthly table from days of 10-minute bins: [{month, bins}].
+// Only light mornings count (breakfast wind under GRADIENT_KN), as in the original table.
+export function buildClimatology(days) {
+  const byMonth = {};
+  for (const { month, bins } of days) {
+    if (bins.filter(b => b.minutes >= 540 && b.minutes < 960 && b.fw != null).length < MIN_DAY_BINS) continue;
+    const morning = morningMean(bins);
+    if (morning == null || morning >= GRADIENT_KN) continue;
+    const i = findSettled(bins);
+    (byMonth[month] ??= []).push(i >= 0 ? bins[i].minutes : null);
+  }
+  const out = {};
+  for (const [month, arrivals] of Object.entries(byMonth)) {
+    if (arrivals.length < MIN_MONTH_DAYS) continue;
+    const hit = arrivals.filter(m => m != null).sort((a, b) => a - b);
+    if (!hit.length) continue;
+    const r2 = x => Math.round(x * 100) / 100;
+    out[month] = {
+      days: arrivals.length,
+      chance: r2(hit.length / arrivals.length),
+      before13: r2(hit.filter(m => m <= 780).length / arrivals.length),
+      p25: Math.round(quantile(hit, 0.25)), p50: Math.round(quantile(hit, 0.5)), p75: Math.round(quantile(hit, 0.75)),
+    };
+  }
+  return out;
+}
+
 export function climatologyFor(month) {
   if (CLIMATOLOGY[month]) return { ...CLIMATOLOGY[month], month, fallback: false };
   // No history yet for this month: use the nearest month we have.

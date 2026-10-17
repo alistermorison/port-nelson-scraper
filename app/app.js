@@ -1,5 +1,5 @@
 import {
-  cleanRows, bin10, evaluate, nzParts, fmtMinutes, fmtDDM, POLARS, beatLength, raceWind, TARGET_MINUTES, toMagnetic, MAG_VARIATION_E, COURSE_AREAS, isOnshore,
+  cleanRows, bin10, evaluate, nzParts, fmtMinutes, fmtDDM, POLARS, beatLength, raceWind, TARGET_MINUTES, toMagnetic, MAG_VARIATION_E, COURSE_AREAS, isOnshore, setClimatology,
 } from './logic.js';
 
 const SUPABASE_URL = 'https://sffjznjsxcnhetmiipui.supabase.co';
@@ -55,7 +55,7 @@ function render() {
     $('windowLabel').textContent = 'Expected arrival';
     $('window').textContent = `${fmtMinutes(r.window.lo)}–${fmtMinutes(r.window.hi)}`;
     $('windowNote').textContent = r.window.fromHistory
-      ? `From history for ${monthName(r.clim.month)}${r.clim.fallback ? ' (nearest month with data)' : ''}. Most likely about ${fmtMinutes(r.window.typical)}.`
+      ? `From ${r.clim.days} ${monthName(r.clim.month)} mornings${r.clim.fallback ? ' (nearest month with enough data)' : ''}. Most likely about ${fmtMinutes(r.window.typical)}.`
       : `Most likely about ${fmtMinutes(r.window.typical)}.`;
   } else {
     $('windowLabel').textContent = 'Breeze arrived';
@@ -196,6 +196,14 @@ function watchGps() {
   );
 }
 
+// The history is rebuilt nightly from all harbour data; the built-in table is the fallback.
+async function loadHistory() {
+  try {
+    const res = await fetch('climatology.json', { cache: 'no-cache' });
+    if (res.ok) setClimatology((await res.json()).months);
+  } catch { /* offline: keep the built-in table */ }
+}
+
 watchGps();
-refresh();
+loadHistory().then(refresh);
 setInterval(refresh, REFRESH_MS);

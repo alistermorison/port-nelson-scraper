@@ -15,3 +15,9 @@ as a CSV, so race days can be compared with what the app said.
 `logic.js` holds all the rules as pure functions. Run the tests with
 `node --test 'app/*.test.mjs'`. Netlify publishes the repo, so the page is at
 `/app/` on the port-nelson-weather site.
+
+The arrival history (expected arrival window, chance of a breeze by 13:00) is rebuilt
+every night by `.github/workflows/climatology.yml`, which runs `build-climatology.mjs`
+over all harbour data and commits `climatology.json`. The page loads that file and
+falls back to the table in `logic.js` if it is missing. A month needs at least 8 light
+mornings before it gets its own numbers; until then it borrows the nearest month's.

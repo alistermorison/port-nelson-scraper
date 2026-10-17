@@ -1,0 +1,38 @@
+name: Sea Breeze Start history
+# Nightly: rebuild the monthly sea breeze history from all harbour data so the
+# page's arrival times and postponement advice keep learning through the summer.
+on:
+  schedule:
+    - cron: '30 14 * * *' # 02:30 NZST / 03:30 NZDT
+  workflow_dispatch:
+  pull_request:
+    paths: ['app/build-climatology.mjs', 'app/logic.js', '.github/workflows/climatology.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: climatology
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Rebuild the history (dry run on pull requests)
+        run: node app/build-climatology.mjs ${{ github.event_name == 'pull_request' && '--dry-run' || '' }}
+      - name: Commit if it changed
+        if: github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- app/climatology.json && git ls-files --error-unmatch app/climatology.json >/dev/null 2>&1; then
+            echo "No change"; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git add app/climatology.json
+          git commit -m "Rebuild sea breeze history"
+          git push

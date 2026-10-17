@@ -12,5 +12,5 @@ Taps on "What you can see" are kept on the phone for the day and can be download
 as a CSV, so race days can be compared with what the app said.
 
 `logic.js` holds all the rules as pure functions. Run the tests with
-`node --test 'app/*.test.mjs'`. The page is published to GitHub Pages by
-`.github/workflows/pages.yml` on every push to `main` that touches `app/`.
+`node --test 'app/*.test.mjs'`. Netlify publishes the repo, so the page is at
+`/app/` on the port-nelson-weather site.

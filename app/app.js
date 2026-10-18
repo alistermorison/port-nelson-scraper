@@ -35,7 +35,7 @@ async function fetchRows() {
 function settings() {
   const num = (id, d) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : d; };
   return {
-    area: $('area').value, gradient: $('mode').value === 'gradient', veer: num('veer', 8), lay: num('lay', 15), seq: num('seq', 5),
+    area: $('area').value, gradient: $('mode').value === 'gradient', lay: num('lay', 15), seq: num('seq', 5),
     sigOuter: +$('sigOuter').value, sigInner: +$('sigInner').value,
     pctOuter: num('pctOuter', 100), pctInner: num('pctInner', 100),
   };
@@ -43,7 +43,7 @@ function settings() {
 
 function render() {
   const s = settings();
-  const r = evaluate(bins, { nowMs: Date.now(), taps: getTaps(), veer: s.veer, layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient });
+  const r = evaluate(bins, { nowMs: Date.now(), taps: getTaps(), layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient });
 
   $('status').textContent = r.status;
   $('status').className = `status ${r.status.split(' ')[0]}`;
@@ -96,7 +96,9 @@ function render() {
   $('sizeNote').textContent = `Sized for a ${TARGET_MINUTES}-minute race for the leading boat: J/111 on signal ${s.sigOuter}, Elliott 5.9 on signal ${s.sigInner}, `
     + (wind.source === 'live' ? `in the ${wind.kn.toFixed(0)} kn now at the Fairway.` : s.gradient ? `in a typical ${wind.kn} kn until the wind fills in.` : `in a typical ${wind.kn} kn sea breeze until the breeze arrives.`);
   $('bearingNote').textContent = r.bearing.source === 'live'
-    ? `Fairway direction over the last 30 minutes plus ${s.veer}° for the usual veer, give or take ${r.bearing.spread}°.`
+    ? (r.bearing.swing
+      ? `Fairway is ${r.bearing.live}°T now. A new sea breeze usually swings towards about 355°T over two hours, so this is set ${Math.abs(r.bearing.swing)}° towards that, give or take ${r.bearing.spread}°.`
+      : `Fairway direction over the last 30 minutes, give or take ${r.bearing.spread}°. The breeze has had time to settle.`)
     : r.bearing.source === 'gradient'
     ? `Fairway direction over the last 30 minutes, give or take ${r.bearing.spread}°. No veer added in a gradient wind.`
     : 'Expected sea breeze axis from history (usually about 355°T), not the wind blowing now. Updates when the breeze settles.';
@@ -160,7 +162,7 @@ function renderLog() {
 function tap(kind) {
   const taps = getTaps();
   const s = settings();
-  const r = evaluate(bins, { nowMs: Date.now(), taps, veer: s.veer, layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient });
+  const r = evaluate(bins, { nowMs: Date.now(), taps, layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient });
   taps.push({ kind, ms: Date.now(), status: r.status, bearing: r.bearing.bearing, fw: r.latest?.fw ?? null, fd: r.latest?.fd ?? null });
   store.set(todayKey(), taps);
   render();
@@ -187,7 +189,7 @@ async function refresh() {
   render();
 }
 
-for (const id of ['mode', 'area', 'sigOuter', 'sigInner', 'pctOuter', 'pctInner', 'veer', 'lay', 'seq']) {
+for (const id of ['mode', 'area', 'sigOuter', 'sigInner', 'pctOuter', 'pctInner', 'lay', 'seq']) {
   const saved = store.get(`setting-${id}`, null);
   if (saved != null) $(id).value = saved;
   $(id).addEventListener('change', () => { store.set(`setting-${id}`, $(id).value); watchGps(); render(); });

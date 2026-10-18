@@ -7,6 +7,11 @@ stations from Supabase every 2 minutes and shows:
 - the expected arrival window and a suggested start time
 - a "For Buoy Zone" panel: course axis, distances to marks 1 (outer, J/111) and 1a (inner,
   Elliott 5.9) sized for a 45-minute race, and start boat position, tap to copy
+- once the breeze settles, an axis set from the live Fairway direction swung towards
+  about 355°T: 85% of the gap at first, fading to none two hours after it settled. On 30
+  clean breeze days (Jul-Oct 2026) the breeze closed about 85% of the gap to 355° within
+  about 100 minutes; westerly arrivals veered about 60° at 30-35° an hour. The old fixed
+  8° veer was within 15° of the settled direction on 10 of those days, this rule on 15.
 - a postponement suggestion when the breeze looks unlikely before 13:00
 - a "Race in the gradient wind" setting: the axis follows the live Fairway wind from any
   direction (no veer added) and the start is as soon as the marks can be laid

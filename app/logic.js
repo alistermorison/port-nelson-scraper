@@ -3,6 +3,10 @@
 
 export const TZ = 'Pacific/Auckland';
 export const SETTLED_BEARING = 355; // median settled sea breeze direction at the Fairway
+// After arrival the breeze swings towards SETTLED_BEARING: about 85% of the gap,
+// over roughly two hours (30 clean breeze days, Jul-Oct 2026).
+export const SWING_SHARE = 0.85;
+export const SWING_MINUTES = 120;
 export const ONSHORE_AXIS = 355;    // onshore component is measured along this bearing
 export const MIN_STEADY_KN = 4;
 export const ALERT_ONSHORE_KN = 2;
@@ -192,7 +196,7 @@ export function recentDirection(bins, n = 3) {
 }
 
 // taps: [{kind, ms}], kinds: 'wind-on-water', 'plume', 'cloud', 'mark-laid', 'breeze-in'
-export function evaluate(bins, { nowMs, taps = [], veer = 8, layMinutes = 15, sequenceMinutes = 5, gradientRace = false } = {}) {
+export function evaluate(bins, { nowMs, taps = [], layMinutes = 15, sequenceMinutes = 5, gradientRace = false } = {}) {
   const now = nzParts(nowMs);
   // Only today's readings count: in the early morning the page also holds last
   // evening's, and an evening sea breeze must not read as this morning's.
@@ -249,7 +253,12 @@ export function evaluate(bins, { nowMs, taps = [], veer = 8, layMinutes = 15, se
   let bearing;
   if (status === 'Settled' || status === 'Unsettled') {
     const d = recentDirection(bins, 3);
-    if (d) bearing = { bearing: norm360(Math.round(d.mean + veer)), spread: Math.max(5, Math.round(d.spread)), source: 'live' };
+    if (d) {
+      const since = settledIdx >= 0 ? now.minutes - bins[settledIdx].minutes : SWING_MINUTES;
+      const share = SWING_SHARE * Math.max(0, 1 - since / SWING_MINUTES);
+      const swing = Math.round(share * angleDiff(SETTLED_BEARING, d.mean));
+      bearing = { bearing: norm360(Math.round(d.mean) + swing), live: norm360(Math.round(d.mean)), swing, spread: Math.max(5, Math.round(d.spread)), source: 'live' };
+    }
   }
   if (!bearing) {
     bearing = { bearing: SETTLED_BEARING, spread: 20, source: 'history' };

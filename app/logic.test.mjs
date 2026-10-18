@@ -95,7 +95,7 @@ test('evaluate walks through the morning statuses', () => {
   const settled = ev(700);
   assert.equal(settled.status, 'Settled');
   assert.equal(settled.bearing.source, 'live');
-  assert.equal(settled.bearing.bearing, 3); // 355 + 8 veer
+  assert.equal(settled.bearing.bearing, 355); // already on the usual axis, no swing
   assert.equal(settled.start.start, 700 + 15 + 5);
   assert.equal(settled.start.warning, 715);
 });
@@ -246,4 +246,16 @@ test('warns that the breeze may not come on a strong offshore gradient day', () 
   assert.equal(noBreezeWarning({ gradOnshore: -4.2 }, 5), null);   // light breakfast wind
   assert.equal(noBreezeWarning({ gradOnshore: -1 }, 12), null);    // little gradient forecast
   assert.equal(noBreezeWarning(null, 12), null);
+});
+
+test('a new westerly breeze is set towards 355, fading over two hours', () => {
+  // Settles at 11:00 from 295 (60 degrees short of 355); data runs to 12:59.
+  const all = day(m => m < 660 ? { fw: 2, fd: 160 } : { fw: 7, fd: 295 });
+  const ev = m => evaluate(all.filter(x => x.minutes < m), { nowMs: at(m) });
+  const first = ev(700).bearing;                      // 40 minutes after settling
+  assert.equal(first.live, 295);
+  assert.equal(first.swing, 34);                      // 0.85 * (1 - 40/120) * 60
+  assert.equal(first.bearing, 329);
+  assert.ok(ev(770).bearing.swing < first.swing);     // shrinks as the breeze ages
+  assert.equal(evaluate(all, { nowMs: at(660 + 130) }).bearing.swing, 0);
 });

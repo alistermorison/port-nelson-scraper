@@ -14,7 +14,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } },
 };
 
-let lastStatus = null, gps = null, bins = [];
+let lastStatus = null, lastSwinging = false, gps = null, bins = [];
 
 function todayKey() {
   const p = nzParts(Date.now());
@@ -35,7 +35,7 @@ async function fetchRows() {
 function settings() {
   const num = (id, d) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : d; };
   return {
-    area: $('area').value, gradient: $('mode').value === 'gradient', lay: num('lay', 15), seq: num('seq', 5),
+    area: $('area').value, gradient: $('mode').value === 'gradient', hold: $('hold').value !== 'no', lay: num('lay', 15), seq: num('seq', 5),
     sigOuter: +$('sigOuter').value, sigInner: +$('sigInner').value,
     pctOuter: num('pctOuter', 100), pctInner: num('pctInner', 100),
   };
@@ -43,7 +43,7 @@ function settings() {
 
 function render() {
   const s = settings();
-  const r = evaluate(bins, { nowMs: Date.now(), taps: getTaps(), layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient });
+  const r = evaluate(bins, { nowMs: Date.now(), taps: getTaps(), layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient, holdForDirection: s.hold });
 
   $('status').textContent = r.status;
   $('status').className = `status ${r.status.split(' ')[0]}`;
@@ -77,7 +77,7 @@ function render() {
 
   if (r.start) {
     $('start').textContent = fmtMinutes(r.start.start);
-    $('startNote').textContent = `Warning signal ${fmtMinutes(r.start.warning)}${r.start.provisional ? '. Provisional until the breeze settles.' : '.'}`;
+    $('startNote').textContent = `Warning signal ${fmtMinutes(r.start.warning)}${r.start.provisional ? (r.swinging ? '. Provisional until the direction steadies.' : '. Provisional until the breeze settles.') : '.'}`;
   } else {
     $('start').textContent = '–';
     $('startNote').textContent = s.gradient ? 'Wait for 30 minutes of 4 kn or more.' : 'Wait for a steady breeze.';
@@ -114,7 +114,8 @@ function render() {
 
   if (lastStatus && r.status === 'Arriving' && lastStatus !== 'Arriving') navigator.vibrate?.([300, 150, 300]);
   if (lastStatus && r.status === 'Settled' && lastStatus !== 'Settled') navigator.vibrate?.([600]);
-  lastStatus = r.status;
+  if (lastSwinging && !r.swinging && r.status === 'Settled') navigator.vibrate?.([600]);
+  lastStatus = r.status; lastSwinging = r.swinging;
 
   drawChart();
   renderLog();
@@ -162,7 +163,7 @@ function renderLog() {
 function tap(kind) {
   const taps = getTaps();
   const s = settings();
-  const r = evaluate(bins, { nowMs: Date.now(), taps, layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient });
+  const r = evaluate(bins, { nowMs: Date.now(), taps, layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient, holdForDirection: s.hold });
   taps.push({ kind, ms: Date.now(), status: r.status, bearing: r.bearing.bearing, fw: r.latest?.fw ?? null, fd: r.latest?.fd ?? null });
   store.set(todayKey(), taps);
   render();
@@ -189,7 +190,7 @@ async function refresh() {
   render();
 }
 
-for (const id of ['mode', 'area', 'sigOuter', 'sigInner', 'pctOuter', 'pctInner', 'lay', 'seq']) {
+for (const id of ['mode', 'hold', 'area', 'sigOuter', 'sigInner', 'pctOuter', 'pctInner', 'lay', 'seq']) {
   const saved = store.get(`setting-${id}`, null);
   if (saved != null) $(id).value = saved;
   $(id).addEventListener('change', () => { store.set(`setting-${id}`, $(id).value); watchGps(); render(); });

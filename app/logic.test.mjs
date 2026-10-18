@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  noBreezeWarning, summariseForecast, forecastHint, climatologyFor, setClimatology, buildClimatology, CLIMATOLOGY, vectorMean, cleanRows, bin10, findSettled, findAlert, evaluate,
+  noBreezeWarning, summariseForecast, forecastHint, climatologyFor, setClimatology, buildClimatology, CLIMATOLOGY, vectorMean, cleanRows, bin10, findSettled, findAlert, evaluate, findDirectionSteady,
   destination, fmtDDM, fmtMinutes, nzParts, COURSE_AREAS,
   POLARS, polarAt, COURSE_SIGNALS, beatLength, raceWind, TYPICAL_BREEZE_KN, toMagnetic,
 } from './logic.js';
@@ -96,8 +96,17 @@ test('evaluate walks through the morning statuses', () => {
   assert.equal(settled.status, 'Settled');
   assert.equal(settled.bearing.source, 'live');
   assert.equal(settled.bearing.bearing, 355); // already on the usual axis, no swing
-  assert.equal(settled.start.start, 700 + 15 + 5);
-  assert.equal(settled.start.warning, 715);
+  // Settled at 11:00 but not yet 50 minutes of direction history: hold the start.
+  assert.equal(settled.swinging, true);
+  assert.equal(settled.start.provisional, true);
+  assert.equal(settled.start.start, 660 + 70 + 15 + 5);
+  const noHold = evaluate(upTo(700), { nowMs: at(700), holdForDirection: false });
+  assert.equal(noHold.start.start, 700 + 15 + 5);
+  assert.equal(noHold.start.warning, 715);
+  const steady = ev(760);                          // 355 all along: steady from the 11:50 bin
+  assert.equal(steady.swinging, false);
+  assert.equal(steady.start.provisional, undefined);
+  assert.equal(steady.start.start, 760 + 15 + 5);
 });
 
 test('evaluate flags breeze that comes in then fades', () => {
@@ -258,4 +267,13 @@ test('a new westerly breeze is set towards 355, fading over two hours', () => {
   assert.equal(first.bearing, 329);
   assert.ok(ev(770).bearing.swing < first.swing);     // shrinks as the breeze ages
   assert.equal(evaluate(all, { nowMs: at(660 + 130) }).bearing.swing, 0);
+});
+
+test('the first start waits while the breeze is still swinging', () => {
+  // Arrives from 290 at 11:00 and veers 0.5 degrees a minute until 355 at 13:10.
+  const all = day(m => m < 660 ? { fw: 2, fd: 160 } : { fw: 7, fd: Math.min(355, 290 + (m - 660) / 2) });
+  const ev = m => evaluate(all.filter(x => x.minutes < m), { nowMs: at(m) });
+  assert.equal(ev(740).swinging, true);
+  assert.equal(ev(740).status, 'Settled');
+  assert.equal(findDirectionSteady(all, findSettled(all)), -1); // still veering at 12:50
 });

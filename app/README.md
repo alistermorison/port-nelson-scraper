@@ -12,6 +12,11 @@ stations from Supabase every 2 minutes and shows:
   clean breeze days (Jul-Oct 2026) the breeze closed about 85% of the gap to 355° within
   about 100 minutes; westerly arrivals veered about 60° at 30-35° an hour. The old fixed
   8° veer was within 15° of the settled direction on 10 of those days, this rule on 15.
+- a hold on the first start while the breeze is still swinging (setting, on by default):
+  the direction has steadied when the last 30 minutes stay within 10° and their mean is
+  within 8° of the 30 minutes before. On the same 30 days this came a median 70 minutes
+  after arrival, about 50 minutes later than starting at arrival, and an axis set then
+  stayed within 15° for 51% of the next four races (35% when set at arrival)
 - a postponement suggestion when the breeze looks unlikely before 13:00
 - a "Race in the gradient wind" setting: the axis follows the live Fairway wind from any
   direction (no veer added) and the start is as soon as the marks can be laid

@@ -14,7 +14,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } },
 };
 
-let lastStatus = null, gps = null, bins = [];
+let lastStatus = null, lastSwinging = false, gps = null, bins = [];
 
 function todayKey() {
   const p = nzParts(Date.now());
@@ -35,7 +35,7 @@ async function fetchRows() {
 function settings() {
   const num = (id, d) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : d; };
   return {
-    area: $('area').value, gradient: $('mode').value === 'gradient', veer: num('veer', 8), lay: num('lay', 15), seq: num('seq', 5),
+    area: $('area').value, gradient: $('mode').value === 'gradient', hold: $('hold').value !== 'no', lay: num('lay', 15), seq: num('seq', 5),
     sigOuter: +$('sigOuter').value, sigInner: +$('sigInner').value,
     pctOuter: num('pctOuter', 100), pctInner: num('pctInner', 100),
   };
@@ -43,7 +43,7 @@ function settings() {
 
 function render() {
   const s = settings();
-  const r = evaluate(bins, { nowMs: Date.now(), taps: getTaps(), veer: s.veer, layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient });
+  const r = evaluate(bins, { nowMs: Date.now(), taps: getTaps(), layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient, holdForDirection: s.hold });
 
   $('status').textContent = r.status;
   $('status').className = `status ${r.status.split(' ')[0]}`;
@@ -77,7 +77,7 @@ function render() {
 
   if (r.start) {
     $('start').textContent = fmtMinutes(r.start.start);
-    $('startNote').textContent = `Warning signal ${fmtMinutes(r.start.warning)}${r.start.provisional ? '. Provisional until the breeze settles.' : '.'}`;
+    $('startNote').textContent = `Warning signal ${fmtMinutes(r.start.warning)}${r.start.provisional ? (r.swinging ? '. Provisional until the direction steadies.' : '. Provisional until the breeze settles.') : '.'}`;
   } else {
     $('start').textContent = '–';
     $('startNote').textContent = s.gradient ? 'Wait for 30 minutes of 4 kn or more.' : 'Wait for a steady breeze.';
@@ -96,7 +96,9 @@ function render() {
   $('sizeNote').textContent = `Sized for a ${TARGET_MINUTES}-minute race for the leading boat: J/111 on signal ${s.sigOuter}, Elliott 5.9 on signal ${s.sigInner}, `
     + (wind.source === 'live' ? `in the ${wind.kn.toFixed(0)} kn now at the Fairway.` : s.gradient ? `in a typical ${wind.kn} kn until the wind fills in.` : `in a typical ${wind.kn} kn sea breeze until the breeze arrives.`);
   $('bearingNote').textContent = r.bearing.source === 'live'
-    ? `Fairway direction over the last 30 minutes plus ${s.veer}° for the usual veer, give or take ${r.bearing.spread}°.`
+    ? (r.bearing.swing
+      ? `Fairway is ${r.bearing.live}°T now. A new sea breeze usually swings towards about 355°T over two hours, so this is set ${Math.abs(r.bearing.swing)}° towards that, give or take ${r.bearing.spread}°.`
+      : `Fairway direction over the last 30 minutes, give or take ${r.bearing.spread}°. The breeze has had time to settle.`)
     : r.bearing.source === 'gradient'
     ? `Fairway direction over the last 30 minutes, give or take ${r.bearing.spread}°. No veer added in a gradient wind.`
     : 'Expected sea breeze axis from history (usually about 355°T), not the wind blowing now. Updates when the breeze settles.';
@@ -112,7 +114,8 @@ function render() {
 
   if (lastStatus && r.status === 'Arriving' && lastStatus !== 'Arriving') navigator.vibrate?.([300, 150, 300]);
   if (lastStatus && r.status === 'Settled' && lastStatus !== 'Settled') navigator.vibrate?.([600]);
-  lastStatus = r.status;
+  if (lastSwinging && !r.swinging && r.status === 'Settled') navigator.vibrate?.([600]);
+  lastStatus = r.status; lastSwinging = r.swinging;
 
   drawChart();
   renderLog();
@@ -160,7 +163,7 @@ function renderLog() {
 function tap(kind) {
   const taps = getTaps();
   const s = settings();
-  const r = evaluate(bins, { nowMs: Date.now(), taps, veer: s.veer, layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient });
+  const r = evaluate(bins, { nowMs: Date.now(), taps, layMinutes: s.lay, sequenceMinutes: s.seq, gradientRace: s.gradient, holdForDirection: s.hold });
   taps.push({ kind, ms: Date.now(), status: r.status, bearing: r.bearing.bearing, fw: r.latest?.fw ?? null, fd: r.latest?.fd ?? null });
   store.set(todayKey(), taps);
   render();
@@ -187,7 +190,7 @@ async function refresh() {
   render();
 }
 
-for (const id of ['mode', 'area', 'sigOuter', 'sigInner', 'pctOuter', 'pctInner', 'veer', 'lay', 'seq']) {
+for (const id of ['mode', 'hold', 'area', 'sigOuter', 'sigInner', 'pctOuter', 'pctInner', 'lay', 'seq']) {
   const saved = store.get(`setting-${id}`, null);
   if (saved != null) $(id).value = saved;
   $(id).addEventListener('change', () => { store.set(`setting-${id}`, $(id).value); watchGps(); render(); });

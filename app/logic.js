@@ -3,6 +3,10 @@
 
 export const TZ = 'Pacific/Auckland';
 export const SETTLED_BEARING = 355; // median settled sea breeze direction at the Fairway
+// After arrival the breeze swings towards SETTLED_BEARING: about 85% of the gap,
+// over roughly two hours (30 clean breeze days, Jul-Oct 2026).
+export const SWING_SHARE = 0.85;
+export const SWING_MINUTES = 120;
 export const ONSHORE_AXIS = 355;    // onshore component is measured along this bearing
 export const MIN_STEADY_KN = 4;
 export const ALERT_ONSHORE_KN = 2;
@@ -191,8 +195,33 @@ export function recentDirection(bins, n = 3) {
   return { mean, spread };
 }
 
+// After the breeze settles its direction keeps swinging for a while. The direction
+// has steadied when the last 30 minutes stay within 10 degrees of their mean and that
+// mean is within 8 degrees of the 30 minutes before. On 30 clean breeze days (Jul-Oct
+// 2026) this came a median 70 minutes after arrival (middle half 58-92), and an axis set
+// then stayed within 15 degrees for 51% of the next four races against 35% when set at
+// arrival. Returns the index of the bin where it first holds, or -1.
+export const DIRECTION_SPREAD = 10, DIRECTION_DRIFT = 8, DIRECTION_TYPICAL_MIN = 70;
+export function findDirectionSteady(bins, settledIdx) {
+  if (settledIdx < 0) return -1;
+  const from = bins[settledIdx].minutes;
+  const mean = (lo, hi) => {
+    const xs = bins.filter(b => b.minutes >= lo && b.minutes <= hi && b.fd != null && b.fw != null);
+    return xs.length >= 2 ? { xs, m: vectorMean(xs.map(b => [b.fw, b.fd])) } : null;
+  };
+  for (let i = settledIdx; i < bins.length; i++) {
+    const m = bins[i].minutes;
+    if (m < from + 50) continue;
+    const last = mean(m - 30, m), now = mean(m - 20, m), before = mean(m - 50, m - 30);
+    if (!last || last.xs.length < 3 || !now || !before) continue;
+    if (Math.max(...last.xs.map(b => Math.abs(angleDiff(b.fd, last.m)))) > DIRECTION_SPREAD) continue;
+    if (Math.abs(angleDiff(now.m, before.m)) <= DIRECTION_DRIFT) return i;
+  }
+  return -1;
+}
+
 // taps: [{kind, ms}], kinds: 'wind-on-water', 'plume', 'cloud', 'mark-laid', 'breeze-in'
-export function evaluate(bins, { nowMs, taps = [], veer = 8, layMinutes = 15, sequenceMinutes = 5, gradientRace = false } = {}) {
+export function evaluate(bins, { nowMs, taps = [], layMinutes = 15, sequenceMinutes = 5, gradientRace = false, holdForDirection = true } = {}) {
   const now = nzParts(nowMs);
   // Only today's readings count: in the early morning the page also holds last
   // evening's, and an evening sea breeze must not read as this morning's.
@@ -208,13 +237,24 @@ export function evaluate(bins, { nowMs, taps = [], veer = 8, layMinutes = 15, se
   const steadyNow = bins.length >= 3 && steadyBin(bins.at(-1)) && steadyBin(bins.at(-2)) && steadyBin(bins.at(-3));
   const gradient = morning != null && morning >= GRADIENT_KN;
 
-  let status, detail, window = null, start = null;
+  let status, detail, window = null, start = null, swinging = false;
 
   if (settledIdx >= 0 && steadyNow) {
     status = 'Settled';
-    detail = `Steady onshore breeze since ${fmtMinutes(bins[settledIdx].minutes)}.`;
-    const s = Math.max(now.minutes, bins[settledIdx].minutes + 30) + layMinutes + sequenceMinutes;
-    start = { start: s, warning: s - sequenceMinutes };
+    const since = bins[settledIdx].minutes;
+    detail = `Steady onshore breeze since ${fmtMinutes(since)}.`;
+    const dirIdx = holdForDirection ? findDirectionSteady(bins, settledIdx) : -1;
+    if (holdForDirection && dirIdx < 0) {
+      swinging = true;
+      detail += ' The direction is still swinging, so hold the first start until it steadies.';
+      const s = Math.max(now.minutes + 10, since + DIRECTION_TYPICAL_MIN) + layMinutes + sequenceMinutes;
+      start = { start: s, warning: s - sequenceMinutes, provisional: true };
+    } else {
+      if (dirIdx >= 0) detail += ` Direction steady since ${fmtMinutes(bins[dirIdx].minutes + 10)}.`;
+      const ready = dirIdx >= 0 ? bins[dirIdx].minutes + 10 : since + 30;
+      const s = Math.max(now.minutes, ready) + layMinutes + sequenceMinutes;
+      start = { start: s, warning: s - sequenceMinutes };
+    }
   } else if (settledIdx >= 0) {
     status = 'Unsettled';
     detail = `The breeze came in at ${fmtMinutes(bins[settledIdx].minutes)} but has eased or swung. Wait for 30 minutes of steady wind.`;
@@ -249,7 +289,12 @@ export function evaluate(bins, { nowMs, taps = [], veer = 8, layMinutes = 15, se
   let bearing;
   if (status === 'Settled' || status === 'Unsettled') {
     const d = recentDirection(bins, 3);
-    if (d) bearing = { bearing: norm360(Math.round(d.mean + veer)), spread: Math.max(5, Math.round(d.spread)), source: 'live' };
+    if (d) {
+      const since = settledIdx >= 0 ? now.minutes - bins[settledIdx].minutes : SWING_MINUTES;
+      const share = SWING_SHARE * Math.max(0, 1 - since / SWING_MINUTES);
+      const swing = Math.round(share * angleDiff(SETTLED_BEARING, d.mean));
+      bearing = { bearing: norm360(Math.round(d.mean) + swing), live: norm360(Math.round(d.mean)), swing, spread: Math.max(5, Math.round(d.spread)), source: 'live' };
+    }
   }
   if (!bearing) {
     bearing = { bearing: SETTLED_BEARING, spread: 20, source: 'history' };
@@ -268,7 +313,7 @@ export function evaluate(bins, { nowMs, taps = [], veer = 8, layMinutes = 15, se
   }
 
   const settledAt = settledIdx >= 0 ? bins[settledIdx].minutes : null;
-  return { status, detail, window, start, bearing, postpone, morning, clim, latest, settledIdx, settledAt, alertIdx };
+  return { status, detail, window, start, bearing, postpone, morning, clim, latest, settledIdx, settledAt, alertIdx, swinging };
 }
 
 // Racing in the gradient wind: any direction counts, and the axis is the live

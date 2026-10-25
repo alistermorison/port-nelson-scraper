@@ -229,12 +229,20 @@ async function loadForecast() {
   } catch { /* offline: no forecast line */ }
 }
 
-// The history is rebuilt nightly from all harbour data; the built-in table is the fallback.
+// The history is rebuilt nightly from all harbour data and committed to GitHub. Read it
+// from there, so the nightly commit doesn't need a Netlify deploy (see netlify.toml);
+// the copy deployed with the page, then the built-in table, are the fallbacks.
+const HISTORY_URLS = [
+  'https://raw.githubusercontent.com/alistermorison/port-nelson-scraper/main/app/climatology.json',
+  'climatology.json',
+];
 async function loadHistory() {
-  try {
-    const res = await fetch('climatology.json', { cache: 'no-cache' });
-    if (res.ok) setClimatology((await res.json()).months);
-  } catch { /* offline: keep the built-in table */ }
+  for (const url of HISTORY_URLS) {
+    try {
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (res.ok) { setClimatology((await res.json()).months); return; }
+    } catch { /* offline or blocked: try the next copy */ }
+  }
 }
 
 watchGps();

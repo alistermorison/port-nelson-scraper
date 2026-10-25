@@ -30,8 +30,12 @@ as a CSV, so race days can be compared with what the app said.
 
 The arrival history (expected arrival window, chance of a breeze by 13:00) is rebuilt
 every night by `.github/workflows/climatology.yml`, which runs `build-climatology.mjs`
-over all harbour data and commits `climatology.json`. The page loads that file and
-falls back to the table in `logic.js` if it is missing. A month needs at least 8 light
+over all harbour data and commits `climatology.json`. The page reads that file from
+GitHub (raw.githubusercontent.com), so the nightly commit doesn't trigger a Netlify
+deploy, and falls back to the deployed copy and then the table in `logic.js`.
+
+`netlify.toml` skips Netlify builds unless the page itself changed: each production
+deploy costs 15 of the free plan's 300 monthly credits. A month needs at least 8 light
 mornings before it gets its own numbers; until then it borrows the nearest month's.
 
 Before the breeze settles, the Breeze card also shows a forecast line from Open-Meteo

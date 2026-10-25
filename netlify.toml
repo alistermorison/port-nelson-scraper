@@ -1,0 +1,5 @@
+# Netlify's free plan charges 15 credits for every production deploy (300 a month).
+# Only deploy when the page itself changes: the nightly history commit, the
+# scraper, tests and docs don't need a deploy. Exit 0 here means "skip the build".
+[build]
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- app netlify.toml ':!app/climatology.json' ':!app/*.test.mjs' ':!app/build-climatology.mjs' ':!app/README.md'"

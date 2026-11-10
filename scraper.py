@@ -35,6 +35,11 @@ class HarborConditions(BaseModel):
     fairway_dir: int = Field(description="Extract ONLY the numeric degree integer for direction (e.g. extract 177 from '177 S')")
     sig_wave_height: Optional[float] = Field(default=None, description="The significant wave height (Sig Wave Hgt / Hs) in metres as a decimal float, or null if not shown")
     h10_wave_height: Optional[float] = Field(default=None, description="The highest tenth wave height (Highest 10th Hgt / H1/10) in metres as a decimal float, or null if not shown")
+    # Port Nelson shows a station's numbers in red text when its data has an error
+    # (normally they are white). These flags are used below and not stored.
+    main_wharf_red: bool = Field(description="True if the numbers in the Main Wharf: Wind box are shown in red text instead of white")
+    fairway_red: bool = Field(description="True if the wind numbers (Wind, Gust, Direction) in the Fairway Beacon box are shown in red text instead of white")
+    no2_pile_red: bool = Field(description="True if the numbers in the No 2 Pile: Current Meter box are shown in red text instead of white")
 
 # 3. Frozen sensor check
 # Sometimes a station on the Port Nelson display stops updating while the rest of
@@ -44,6 +49,9 @@ class HarborConditions(BaseModel):
 # so when a station's values match the last few stored readings exactly, store
 # nulls for that station instead.
 #
+# Port Nelson also turns a station's numbers red when its data has an error, which
+# blanks the station straight away (see blank_red_stations).
+#
 # Each station: its columns, and how many frames in a row (including this one) count
 # as frozen. Current at No 2 Pile changes slowly in 0.1 kn steps, so it gets longer.
 STATIONS = {
@@ -51,6 +59,16 @@ STATIONS = {
     "Fairway Beacon": (["fairway_wind", "fairway_gust", "fairway_dir"], 6),      # 30 min
     "No 2 Pile": (["no2_pile_velocity", "no2_pile_dir"], 12),                    # 1 hour
 }
+
+RED_FLAGS = {"main_wharf_red": "Main Wharf", "fairway_red": "Fairway Beacon", "no2_pile_red": "No 2 Pile"}
+
+def blank_red_stations(data):
+    for flag, name in RED_FLAGS.items():
+        if data.pop(flag, False):
+            print(f"{name} numbers are red on the image (data error); storing nulls for it.")
+            for c in STATIONS[name][0]:
+                data[c] = None
+    return data
 
 def blank_frozen_stations(data):
     for name, (cols, frames) in STATIONS.items():
@@ -106,7 +124,7 @@ def main():
                 print("Max retries reached. Google servers are completely unavailable.")
                 raise e
 
-    data = json.loads(response.text)
+    data = blank_red_stations(json.loads(response.text))
 
     try:
         data = blank_frozen_stations(data)

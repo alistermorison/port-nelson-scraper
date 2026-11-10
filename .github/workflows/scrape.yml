@@ -44,7 +44,22 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scraper.py
 
-      # 5. Alert only when the scraper keeps failing.
+      # 5. Email when a station on the Port Nelson image has been faulty for an hour.
+      # Opens one "Station fault: <station>" issue (GitHub emails it) with a note
+      # to send to Port Nelson, and closes it when the station reads again.
+      - name: Alert if a station has been faulty for an hour
+        if: success() && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NOTIFY: alistermorison
+          ALERT_FRAMES: 12      # frames in a row with no reading (12 = about 1 hour)
+        run: python station_alert.py
+
+      # 6. Alert only when the scraper keeps failing.
       # A single failure is normal (Gemini is sometimes busy), so nothing happens.
       # When the last ALERT_AFTER runs have ALL failed, open one GitHub issue
       # titled "Scraper down", which GitHub emails to you. While that issue is

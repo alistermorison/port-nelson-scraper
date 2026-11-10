@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 import requests
+from urllib.parse import urlencode, quote
 from supabase import create_client
 
 from_env = os.environ.get
@@ -60,7 +61,8 @@ def open_issues():
 
 
 def email_note(name, label, since):
-    return f"""Subject: {name} readings on the harbour conditions image
+    return f"""To: info@portnelson.co.nz
+Subject: {name} readings on the harbour conditions image
 
 Hello,
 
@@ -70,6 +72,13 @@ Could you please pass this on to whoever looks after the instruments?
 
 Many thanks,
 Alister Morison"""
+
+
+def mailto(name, label, since):
+    lines = email_note(name, label, since).split("\n")
+    subject = lines[1].removeprefix("Subject: ")
+    body = "\n".join(lines[3:])
+    return "mailto:info@portnelson.co.nz?" + urlencode({"subject": subject, "body": body}, quote_via=quote)
 
 
 def main():
@@ -87,7 +96,9 @@ def main():
                     f"{ALERT_FRAMES} frames (about {ALERT_FRAMES * 5} minutes). The last good reading was "
                     f"on {since} NZ time. The scraper is storing blanks for {name} until it recovers, "
                     f"and this issue closes itself when it does.\n\n"
-                    f"A note you could email to Port Nelson:\n\n```\n{email_note(name, label, since)}\n```\n")
+                    f"A note you could email to Port Nelson "
+                    f"([open it in your email app]({mailto(name, label, since)})):\n\n"
+                    f"```\n{email_note(name, label, since)}\n```\n")
             r = requests.post(f"{API}/issues", headers=GH, json={"title": title, "body": body})
             r.raise_for_status()
             print(f"Opened #{r.json()['number']}: {title}")

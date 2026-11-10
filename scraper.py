@@ -36,6 +36,49 @@ class HarborConditions(BaseModel):
     sig_wave_height: Optional[float] = Field(default=None, description="The significant wave height (Sig Wave Hgt / Hs) in metres as a decimal float, or null if not shown")
     h10_wave_height: Optional[float] = Field(default=None, description="The highest tenth wave height (Highest 10th Hgt / H1/10) in metres as a decimal float, or null if not shown")
 
+# 3. Frozen sensor check
+# Sometimes a station on the Port Nelson display stops updating while the rest of
+# the image carries on (Main Wharf showed 9.6 kn, gust 12.3, 37 deg from
+# 6 Nov 2026 for days). Gemini reads the stuck numbers correctly, so the rows look
+# real. Real wind never repeats wind, gust and direction exactly for half an hour,
+# so when a station's values match the last few stored readings exactly, store
+# nulls for that station instead.
+#
+# Each station: its columns, and how many frames in a row (including this one) count
+# as frozen. Current at No 2 Pile changes slowly in 0.1 kn steps, so it gets longer.
+STATIONS = {
+    "Main Wharf": (["main_wharf_wind", "main_wharf_gust", "main_wharf_dir"], 6),   # 30 min
+    "Fairway Beacon": (["fairway_wind", "fairway_gust", "fairway_dir"], 6),      # 30 min
+    "No 2 Pile": (["no2_pile_velocity", "no2_pile_dir"], 12),                    # 1 hour
+}
+
+def blank_frozen_stations(data):
+    for name, (cols, frames) in STATIONS.items():
+        current = [data.get(c) for c in cols]
+        if any(v is None for v in current):
+            continue
+        # Latest stored readings for this station (rows already blanked are skipped,
+        # so a long freeze stays blank until the numbers change).
+        rows = (supabase.table("harbor_conditions")
+                .select(",".join(["image_update"] + cols))
+                .not_.is_(cols[0], "null")
+                .order("created_at", desc=True)
+                .limit(frames * 3)
+                .execute().data)
+        previous, seen = [], {data.get("image_update")}
+        for r in rows:
+            # Count each webcam frame once; a repeated frame is not a new reading.
+            if r["image_update"] in seen:
+                continue
+            seen.add(r["image_update"])
+            previous.append([r[c] for c in cols])
+        previous = previous[:frames - 1]
+        if len(previous) == frames - 1 and all(p == current for p in previous):
+            print(f"{name} looks frozen at {current} for {frames} frames; storing nulls for it.")
+            for c in cols:
+                data[c] = None
+    return data
+
 def main():
     response = requests.get(IMG_URL, headers={'User-Agent': 'Mozilla/5.0'})
     img = Image.open(BytesIO(response.content))
@@ -64,6 +107,12 @@ def main():
                 raise e
 
     data = json.loads(response.text)
+
+    try:
+        data = blank_frozen_stations(data)
+    except Exception as e:
+        # Never lose a reading because the check failed.
+        print(f"Frozen sensor check failed ({e}); storing the values as read.")
     
     # Direction columns are integers in Supabase; wave heights may be null
     # if the image doesn't show them.

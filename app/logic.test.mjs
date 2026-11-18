@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   noBreezeWarning, summariseForecast, forecastHint, climatologyFor, setClimatology, buildClimatology, CLIMATOLOGY, vectorMean, cleanRows, bin10, findSettled, findAlert, evaluate, findDirectionSteady,
-  destination, fmtDDM, fmtMinutes, nzParts, COURSE_AREAS,
+  destination, fmtDDM, fmtMinutes, nzParts, COURSE_AREAS, harbourDataGap,
   POLARS, polarAt, COURSE_SIGNALS, beatLength, raceWind, TYPICAL_BREEZE_KN, toMagnetic,
 } from './logic.js';
 
@@ -276,4 +276,20 @@ test('the first start waits while the breeze is still swinging', () => {
   assert.equal(ev(740).swinging, true);
   assert.equal(ev(740).status, 'Settled');
   assert.equal(findDirectionSteady(all, findSettled(all)), -1); // still veering at 12:50
+});
+
+test('says the harbour data is stuck instead of guessing (18 Nov 2026)', () => {
+  // Fairway reads 16.5 kn from 224° from 10:50 to 11:20, then the scraper stores blanks.
+  const b = day(m => m < 650 ? { fw: 18, fd: 219 } : m < 680 ? { fw: 16.5, fd: 224 } : { fw: null, fd: null, mw: null, md: null });
+  const ok = evaluate(b.filter(x => x.minutes < 700), { nowMs: at(700) });
+  assert.notEqual(ok.status, 'No data');           // 20 minutes of blanks: not yet
+  const r = evaluate(b, { nowMs: at(775) });
+  assert.equal(r.status, 'No data');
+  assert.match(r.detail, /since 10:50/);
+  assert.equal(r.window, null);
+  assert.equal(r.start, null);
+  assert.equal(r.postpone, null);
+  assert.equal(evaluate(b, { nowMs: at(775), gradientRace: true }).status, 'No data');
+  assert.deepEqual(harbourDataGap([], at(480)), { since: null });
+  assert.equal(harbourDataGap([], at(400)), null); // before 07:00 nobody is looking
 });

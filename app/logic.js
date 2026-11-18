@@ -228,6 +228,16 @@ export function evaluate(bins, { nowMs, taps = [], layMinutes = 15, sequenceMinu
   const today = `${now.year}-${now.month}-${now.day}`;
   bins = bins.filter(b => b.day == null || b.day === today);
   const clim = climatologyFor(now.month);
+  const gap = harbourDataGap(bins, nowMs);
+  if (gap) {
+    return {
+      status: 'No data', window: null, start: null, postpone: null, morning: morningMean(bins), clim, latest: bins.at(-1) ?? null,
+      settledIdx: -1, settledAt: null, alertIdx: -1, swinging: false, gap,
+      detail: (gap.since == null ? 'No Fairway wind readings yet today.' : `No live Fairway wind since ${fmtMinutes(gap.since)}.`)
+        + " Port Nelson's harbour data looks stuck, so the app can't see the breeze. Times are paused until it comes back; trust your eyes.",
+      bearing: { bearing: SETTLED_BEARING, spread: 20, source: 'history' },
+    };
+  }
   if (gradientRace) return evaluateGradient(bins, { now, clim, layMinutes, sequenceMinutes });
   const morning = morningMean(bins);
   const latest = bins.at(-1) ?? null;
@@ -314,6 +324,20 @@ export function evaluate(bins, { nowMs, taps = [], layMinutes = 15, sequenceMinu
 
   const settledAt = settledIdx >= 0 ? bins[settledIdx].minutes : null;
   return { status, detail, window, start, bearing, postpone, morning, clim, latest, settledIdx, settledAt, alertIdx, swinging };
+}
+
+// Port Nelson's feed sometimes freezes: the webcam image keeps refreshing but its
+// numbers stop changing, and the scraper then stores blanks. If the Fairway has had
+// no live reading for STALE_MINUTES (from 07:00), say so instead of guessing.
+// `since` is when the readings stopped changing (null if none today).
+export const STALE_MINUTES = 30;
+export function harbourDataGap(bins, nowMs) {
+  if (nzParts(nowMs).minutes < 420) return null;
+  let i = bins.findLastIndex(b => b.fw != null);
+  if (i < 0) return { since: null };
+  if (nowMs - (bins[i].t + 600000) <= STALE_MINUTES * 60000) return null;
+  while (i > 0 && bins[i - 1].fw === bins[i].fw && bins[i - 1].fd === bins[i].fd) i--;
+  return { since: bins[i].minutes };
 }
 
 // Racing in the gradient wind: any direction counts, and the axis is the live

@@ -63,7 +63,11 @@ function render() {
   $('postpone').hidden = !advice;
   $('postpone').textContent = advice;
 
-  if (r.window) {
+  if (r.gap) {
+    $('windowLabel').textContent = 'Expected arrival';
+    $('window').textContent = '–';
+    $('windowNote').textContent = 'Paused until harbour data comes back.';
+  } else if (r.window) {
     $('windowLabel').textContent = 'Expected arrival';
     $('window').textContent = `${fmtMinutes(r.window.lo)}–${fmtMinutes(r.window.hi)}`;
     $('windowNote').textContent = r.window.fromHistory
@@ -80,7 +84,7 @@ function render() {
     $('startNote').textContent = `Warning signal ${fmtMinutes(r.start.warning)}${r.start.provisional ? (r.swinging ? '. Provisional until the direction steadies.' : '. Provisional until the breeze settles.') : '.'}`;
   } else {
     $('start').textContent = '–';
-    $('startNote').textContent = s.gradient ? 'Wait for 30 minutes of 4 kn or more.' : 'Wait for a steady breeze.';
+    $('startNote').textContent = r.gap ? 'Paused until harbour data comes back.' : s.gradient ? 'Wait for 30 minutes of 4 kn or more.' : 'Wait for a steady breeze.';
   }
 
   const deg3 = d => String(d).padStart(3, '0');
